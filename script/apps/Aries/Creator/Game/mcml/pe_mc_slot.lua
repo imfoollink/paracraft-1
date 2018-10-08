@@ -66,11 +66,11 @@ function pe_mc_slot.render_callback(mcmlNode, rootName, bindingContext, _parent,
 		_this.animstyle = animstyle;
 	end
 	_this.zorder = mcmlNode:GetNumber("zorder") or 0;
-	_this:GetAttributeObject():SetField("TextOffsetY", 8)
+	_this:GetAttributeObject():SetField("TextOffsetY", 15)
 	_this:GetAttributeObject():SetField("TextShadowQuality", 8);
 	_guihelper.SetFontColor(_this, "#ffffffff");
 	_guihelper.SetUIColor(_this, "#ffffffff");
-	_this.font = "System;12;bold";
+	_this.font = "System;25;bold";
 	_guihelper.SetUIFontFormat(_this, 38);
 	_this.shadow = true;
 	_this.background = "";
@@ -106,7 +106,7 @@ function pe_mc_slot.render_callback(mcmlNode, rootName, bindingContext, _parent,
 				local itemStack = mcmlNode.slot:GetStack();
 				if(itemStack) then
 					local tooltip = itemStack:GetTooltip();
-					return "script/apps/Aries/Creator/Game/mcml/item_tooltip.html?text="..(tooltip or "");
+					return "script/Truck/Truck_item_tooltip.html?text="..(tooltip or "");
 				end
 			end
 		end, mcmlNode:GetNumber("tooltip_offset_x"), mcmlNode:GetNumber("tooltip_offset_y"),
@@ -386,7 +386,8 @@ function pe_mc_slot.OnClickSlot(ui_obj, mcmlNode)
 			local shift_pressed = ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_LSHIFT) or ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_RSHIFT);
 			local ctrl_pressed = ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_LCONTROL) or ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_RCONTROL);
 
-			if(ctrl_pressed and GameLogic.GameMode:IsUseCreatorBag()) then
+			local ModuleManager = commonlib.gettable("Mod.Truck.Game.ModuleManager");
+			if(ctrl_pressed and (ModuleManager.checkModule("EditMode") or ModuleManager.checkModule("MultiPlayerEdit"))) then
 				-- ctrl+left click to clone the given slot item only in editor mode. 
 				local itemStack = mcmlNode.slot:GetStack();
 				if(itemStack) then

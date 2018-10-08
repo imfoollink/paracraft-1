@@ -951,6 +951,17 @@ function BuildQuestProvider.LoadFromTemplate(themeKey,themePath)
 		cur_themesDS[#cur_themesDS+1] = {name = "empty",official = false};
 	end
 	BuildQuestProvider.NeedRefreshDS = false;
+	-----------------------应喻珏要求临时去掉1~3个引导选项
+	if "tutorial"==themeKey then
+		table.remove(cur_themesDS,1);
+		table.remove(cur_themesDS,1);
+		table.remove(cur_themesDS,1);
+		cur_themesDS[1].name="电学入门";
+		table.remove(cur_themes,1);
+		table.remove(cur_themes,1);
+		table.remove(cur_themes,1);
+	end
+	------------------------------------------------------
 end
 
 function BuildQuestProvider.GetCategoryDS()

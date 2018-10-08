@@ -19,7 +19,8 @@ BuildQuest.GetCurrentQuest()
 ]]
 NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/UndoManager.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/BuildQuestProvider.lua");
-NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/QuickSelectBar.lua");
+--NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/QuickSelectBar.lua");
+NPL.load("(gl)script/Truck/QuickSelectBar.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Effects/ObtainItemEffect.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/API/UserProfile.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/DestroyBlockTask.lua");
@@ -30,7 +31,8 @@ local BlockTemplatePage = commonlib.gettable("MyCompany.Aries.Creator.Game.Deskt
 local names = commonlib.gettable("MyCompany.Aries.Game.block_types.names")
 local UserProfile = commonlib.gettable("MyCompany.Aries.Creator.Game.API.UserProfile");
 local ObtainItemEffect = commonlib.gettable("MyCompany.Aries.Game.Effects.ObtainItemEffect");
-local QuickSelectBar = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.QuickSelectBar");
+--local QuickSelectBar = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.QuickSelectBar");
+local QuickSelectBar = commonlib.gettable("Mod.Truck.UI.QuickSelectBar");
 local BuildQuestProvider =  commonlib.gettable("MyCompany.Aries.Game.Tasks.BuildQuestProvider");
 local LocalNPC = commonlib.gettable("MyCompany.Aries.Creator.AI.LocalNPC")
 local UndoManager = commonlib.gettable("MyCompany.Aries.Game.UndoManager");
@@ -48,8 +50,8 @@ if(System.options.IsMobilePlatform) then
 	NPL.load("(gl)script/mobile/paracraft/GUI/HelpPage.lua");
 	HelpPage = commonlib.gettable("ParaCraft.Mobile.GUI.HelpPage");
 else
-	NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/HelpPage.lua");
-	HelpPage = commonlib.gettable("MyCompany.Aries.Game.Tasks.HelpPage");
+	NPL.load("(gl)script/Truck/HelpPage.lua");
+	HelpPage = commonlib.gettable("Mod.Tasks.HelpPage");
 end
 
 local BuildQuest = commonlib.inherit(commonlib.gettable("MyCompany.Aries.Game.Task"), commonlib.gettable("MyCompany.Aries.Game.Tasks.BuildQuest"));
@@ -327,6 +329,16 @@ function BuildQuest.EndEditing(bCommitChange)
 		cur_instance = nil;
 		local profile = UserProfile.GetUser();
 		profile:GetEvents():DispatchEvent({type = "BuildProgressChanged" , status = "end",});
+	end
+	NPL.load("(gl)script/Truck/main.lua");
+	local Truck = commonlib.gettable("Mod.Truck");
+	if(Truck.QuickBtnBarPage) then
+		NPL.load("(gl)script/Truck/HelpPage.lua");
+		local HelpPage = commonlib.gettable("Mod.Tasks.HelpPage");
+		NPL.load("(gl)script/Truck/GoalTracker.lua");
+		local GoalTracker = commonlib.gettable("Mod.UI.GoalTracker");
+		GoalTracker.ShowPage(false);
+		Truck.QuickBtnBarPage:Refresh(0);
 	end
 end
 

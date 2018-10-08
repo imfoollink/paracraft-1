@@ -60,7 +60,12 @@ function ChestPage.ShowPage(entity, OnClose)
 	cur_entity = entity;
 	entity:BeginEdit();
 	local params;
-	if(System.options.IsMobilePlatform) then
+
+	NPL.load("(gl)script/Truck/Utility/CommonUtility.lua");
+	local CommonUtility = commonlib.gettable("Mod.Truck.Utility.CommonUtility");
+	if CommonUtility:IsMobilePlatform() then
+
+	-- if(System.options.IsMobilePlatform) then
 		params = {
 			url = "script/apps/Aries/Creator/Game/GUI/ChestPage.mobile.html", 
 			name = "ChestPage.ShowPage", 
@@ -83,13 +88,13 @@ function ChestPage.ShowPage(entity, OnClose)
 		};
 	else
 		params = {
-			url = "script/apps/Aries/Creator/Game/GUI/ChestPage.html", 
+			url = "script/apps/Aries/Creator/Game/GUI/ChestPage.PC.html", 
 			name = "ChestPage.ShowPage", 
 			isShowTitleBar = false,
 			DestroyOnClose = true,
 			bToggleShowHide=false, 
 			style = CommonCtrl.WindowFrame.ContainerStyle,
-			allowDrag = false,
+			allowDrag = true,
 			enable_esc_key = true,
 			bShow = true,
 			click_through = false, 
@@ -97,10 +102,10 @@ function ChestPage.ShowPage(entity, OnClose)
 			app_key = MyCompany.Aries.Creator.Game.Desktop.App.app_key, 
 			directPosition = true,
 				align = "_ct",
-				x = -210,
-				y = -190,
-				width = 420,
-				height = 380,
+				x = -317,
+				y = -325,
+				width = 635,
+				height = 650,
 		};
 	end
 	System.App.Commands.Call("File.MCMLWindowFrame", params);

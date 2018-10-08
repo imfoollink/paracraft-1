@@ -143,6 +143,9 @@ function EditEntityPage.OnClickOK()
 	local entity = EditEntityPage.GetEntity();
 	if(entity) then
 		local command = page:GetValue("command", "")
+		NPL.load("(gl)script/Truck/Utility/SensitiveWordManager.lua");
+		local SensitiveWordManager = commonlib.gettable("Mod.Truck.Utility.SensitiveWordManager");
+		command=SensitiveWordManager.process(command);
 		command = command:gsub("^%s+", ""):gsub("%s+$", ""):gsub("[\r\n]+$", "");
 		entity:SetCommand(command);
 		entity:Refresh(true);

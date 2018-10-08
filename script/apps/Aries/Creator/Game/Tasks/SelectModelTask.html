@@ -25,30 +25,33 @@ function OnClose()
 end
 ]]></script>
 
-<aries:window title='<%=L"编辑"%>' mode="thin" onclose="OnClose">
-    <div style="width:120px;height:100px;">
-        <div style="margin-left:-4px;margin-top:-20px;">
+<pe:container style="width:220px;height:360;background:url(gameassets\textures\ui_23_offline\33.png:8 8 8 8)">
+    <!-- close btn -->
+    <pe:container alignment="_rt" style="position:relative;background: ;margin-left:5px;margin-top:5px;">
+        <input type="button" name="OnClose" style="position:absolute;width:36px;height:36px;background:url(gameassets\textures\ui_23_offline\10.png) ; "onclick="OnClose" />
+    </pe:container>
+
+    <div style="width:240px;height:200px;">
+        <div style="margin-left:16px;margin-top:16px;">
             <pe:if condition='<%=SelectModel.IsEntity() %>'>
-                <pe:mc_entity_canvas entity='<%=SelectModel.GetEntity()%>' miniscenegraphname="NPCDialog_miniscene" style="width:128px;height:128px;" background="" IsInteractive="false" />
+                <pe:mc_entity_canvas entity='<%=SelectModel.GetEntity()%>' miniscenegraphname="NPCDialog_miniscene" style="width:200px;height:200px;" background="" IsInteractive="false" />
             </pe:if>
             <pe:if condition='<%=not SelectModel.IsEntity() %>'>
                 <pe:canvas3d miniscenegraphname="LeftTopCanvas128" RenderTargetSize="128" autoRotateSpeed="0.12" style="width:128;height:128;" value='<%=GetParams()%>' />
             </pe:if>
         </div>
     </div>
-    <div style="margin-left:0px;margin-top:2px;margin-bottom:10px;">
-        <input type="button" style="margin-left:5px;margin-top:7px;" value='<%=L"移动"%>' tooltip='<%=L"Shift+左键点击场景移动,Ctrl+左键复制"%>' name="move" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
-        <input type="button" style="margin-left:5px;margin-top:7px;" value='<%=L"删除"%>' tooltip='<%=L"快捷键 Del"%>' name="remove" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/><br/>
-        <input type="button" style="margin-left:5px;margin-top:7px;" value='<%=L"左转"%>' tooltip='<%=L"快捷键 ["%>' name="left_rot" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
-        <input type="button" style="margin-left:5px;margin-top:7px;" value='<%=L"右转"%>' tooltip='<%=L"快捷键 ]"%>' name="right_rot" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/><br/>
-        <input type="button" style="margin-left:5px;margin-top:7px;" value='<%=L"缩小"%>' tooltip='<%=L"快捷键 -"%>' name="descale" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
-        <input type="button" style="margin-left:5px;margin-top:7px;" value='<%=L"放大"%>' tooltip='<%=L"快捷键 +"%>' name="scale" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/><br/>
+    <div style="margin-left:28px;margin-top:12px;margin-bottom:25px;">
+        <input type="button" style="margin-left:0px;margin-top:12px;font-size:32px" value='<%=L"移动"%>' tooltip='<%=L"Shift+左键点击场景移动,Ctrl+左键复制"%>' name="move" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
+        <input type="button" style="margin-left:64px;margin-top:12px;font-size:32px" value='<%=L"删除"%>' tooltip='<%=L"快捷键 Del"%>' name="remove" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/><br/>
+        <input type="button" style="margin-left:0px;margin-top:24px;font-size:32px" value='<%=L"左转"%>' tooltip='<%=L"快捷键 ["%>' name="left_rot" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
+        <input type="button" style="margin-left:64px;margin-top:24px;font-size:32px" value='<%=L"右转"%>' tooltip='<%=L"快捷键 ]"%>' name="right_rot" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/><br/>
+        <input type="button" style="margin-left:0px;margin-top:24px;font-size:32px" value='<%=L"缩小"%>' tooltip='<%=L"快捷键 -"%>' name="descale" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
+        <input type="button" style="margin-left:64px;margin-top:24px;font-size:32px" value='<%=L"放大"%>' tooltip='<%=L"快捷键 +"%>' name="scale" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/><br/>
         <pe:if condition='<%=IsCharacter() %>'>
-            <input type="button" style="margin-left:5px;margin-top:7px;" value='<%=L"属性"%>' tooltip="" name="property" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
-            <input type="button" style="margin-left:5px;margin-top:7px;" value='<%=L"逻辑"%>' tooltip="" name="simple_talk" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
         </pe:if>
     </div>
-</aries:window>
+</pe:container>
 </pe:mcml> 
 </body>
 </html>

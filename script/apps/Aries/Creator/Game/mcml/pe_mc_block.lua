@@ -87,6 +87,15 @@ function pe_mc_block.render_callback(mcmlNode, rootName, bindingContext, _parent
 			background = block_item:GetIcon(block_data):gsub("#", ";");	
 		end
 	end
+
+	local name=mcmlNode:GetAttributeWithCode("name", nil, true);
+	if name and pe_mc_block.mReplaceTextures and pe_mc_block.mReplaceTextures[name] then
+		background=pe_mc_block.mReplaceTextures[name];
+	end
+
+	--echo("devilwalk---------------------------------------------------------------debug:pe_mc_block.lua:pe_mc_block.render_callback:pe_mc_block.mReplaceTextures:");
+	--echo(pe_mc_block.mReplaceTextures);
+
 	_this.background = background or "";
 
 	_this:GetAttributeObject():SetField("TextOffsetY", 8)

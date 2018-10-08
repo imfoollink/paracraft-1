@@ -30,7 +30,7 @@ function UrlProtocolHandler:ParseCommand(cmdline)
 		urlProtocol = commonlib.Encoding.url_decode(urlProtocol);
 		LOG.std(nil, "debug", "UrlProtocolHandler", "protocol paracraft://%s", urlProtocol);
 		-- paracraft://cmd/loadworld/[url_filename]
-		local world_url = urlProtocol:match("cmd/loadworld[%s/]+([%S]*)");
+		local world_url = urlProtocol:match("^cmd/loadworld[%s/]+([%S]*)");
 		if(world_url) then
 			System.options.cmdline_world = world_url;
 		end
@@ -46,32 +46,38 @@ end
 
 -- this will spawn a new process that request for admin right
 -- @param protocol_name: TODO: default to "paracraft"
-function UrlProtocolHandler:RegisterUrlProtocol(protocol_name)
+function UrlProtocolHandler:RegisterUrlProtocol(protocol_name, app_name)
 	local protocol_name = protocol_name or "paracraft";
+	local app_name = app_name or "ParaEngineClient.exe";
 	local res = System.os([[reg query "HKCR\]]..protocol_name)
 	if(res and res:match("URL Protocol")) then
 		LOG.std(nil, "info", "RegisterUrlProtocol", "%s url protocol is already installed. We will overwrite it anyway", protocol_name);
 	end
 	local bindir = ParaIO.GetCurDirectory(0):gsub("/", "\\");
 	local file = ParaIO.open("path.txt", "w");
-	file:WriteString(bindir.."ParaEngineClient.exe");
+	file:WriteString(bindir..app_name);
 	file:close();
-	local res = System.os.runAsAdmin([[
+
+	local register = [[
 reg add "HKCR\paracraft" /ve /d "URL:paracraft" /f
 reg add "HKCR\paracraft" /v "URL Protocol" /d ""  /f
 set /p EXEPATH=<"%~dp0path.txt"
-reg add "HKCR\paracraft\shell\open\command" /ve /d "\"%EXEPATH%\" mc=\"true\" %%1" /f
+reg add "HKCR\paracraft\shell\open\command" /ve /d "\"%EXEPATH%\" noupdate=\"true\" debug=\"main\" mc=\"true\" bootstrapper=\"script/apps/Aries/main_loop.lua\" mod=\"Truck\" isDevEnv=\"true\" %%1" /f
 del "%~dp0path.txt"
-]]);
-	LOG.std(nil, "info", "RegisterUrlProtocol", "%s to %s", protocol_name, bindir.."ParaEngineClient.exe");
+]]
+
+	register = register:gsub("paracraft", protocol_name);
+	local res = System.os.runAsAdmin(register);
+	LOG.std(nil, "info", "RegisterUrlProtocol", "%s to %s", protocol_name, bindir..app_name);
 end
 
 -- return true if url protocol is installed
 -- @param protocol_name: default to "paracraft://"
-function UrlProtocolHandler:HasUrlProtocol(protocol_name)
+function UrlProtocolHandler:HasUrlProtocol(protocol_name,app_name)
 	protocol_name = protocol_name or "paracraft";
 	protocol_name = protocol_name:gsub("[://]+","");
-
+	local app_name = app_name or "ParaEngineClient%.exe";
+	
 	local has_protocol = ParaGlobal.ReadRegStr("HKCR", protocol_name, "URL Protocol");
 	if(has_protocol == "") then
 		-- following code is further check, which is not needed. 
@@ -82,7 +88,7 @@ function UrlProtocolHandler:HasUrlProtocol(protocol_name)
 				local filename = cmd:gsub("/", "\\"):match("\"([^\"]+)");
 				if(ParaIO.DoesFileExist(filename, false)) then
 					LOG.std(nil, "info", "Url protocol", "%s:// found in registry as %s", protocol_name, cmd);
-					return true;
+					return filename:match(app_name) ~= nil;
 				else
 					LOG.std(nil, "warn", "Url protocol", "%s:// file not found at %s", protocol_name, filename);
 				end

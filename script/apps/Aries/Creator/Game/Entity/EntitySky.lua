@@ -126,7 +126,8 @@ end
 function Entity:RefreshSky()
 	local filename;
 
-	if(not self.bForceSkyFileOnce and (self:IsSnowing() or self:IsRaining()) ) then
+	local bShouldRefresh = false; -- force disrefresh sky
+	if(not self.bForceSkyFileOnce and (self:IsSnowing() or self:IsRaining()) and bShouldRefresh) then
 		-- set cloudy sky
 		filename = self:GetSkyTemplate(8);
 	else
@@ -144,7 +145,13 @@ function Entity:RefreshSky()
 		sky:SetField("SimulatedSky", false);
 		sky:SetField("SkyFogAngleFrom", 0);
 		sky:SetField("SkyFogAngleTo", 0.2);
-		sky:SetField("SkyMeshFile", filename);
+		if string.find(filename,".fbx") then
+			local CommandManager = commonlib.gettable("MyCompany.Aries.Game.CommandManager");
+			CommandManager:RunCommand("/sky -clear");
+			CommandManager:RunCommand("/sky -add "..filename);
+		else
+			sky:SetField("SkyMeshFile", filename);
+		end
 		if(self.skyTexture) then
 			sky:SetField("SkyMeshTexture", self.skyTexture);
 		end

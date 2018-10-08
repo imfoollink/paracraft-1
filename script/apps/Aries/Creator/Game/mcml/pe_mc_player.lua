@@ -11,9 +11,32 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/mcml/pe_mc_player.lua");
 ]]
 
 NPL.load("(gl)script/apps/Aries/Creator/Game/Entity/EntityManager.lua");
+NPL.load("(gl)script/Truck/Game/Avatar/AvatarAPI.lua");
+NPL.load("(gl)script/Truck/Network/YcProfile.lua");
+local YcProfile = commonlib.gettable("Mod.Truck.Network.YcProfile");
+local AvatarAPI=commonlib.gettable("Truck.Game.Avatar.API");
 local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
 -- create class
 local pe_mc_player = commonlib.gettable("MyCompany.Aries.Game.mcml.pe_mc_player");
+
+local function _applyAvatar(ctl,mcmlNode)
+  local player = ctl:GetObject();
+  if player and player:IsValid() then
+    mcmlNode.mAvatarComponentHandles=AvatarAPI.completeAvatarComponentHandles(mcmlNode.mAvatarComponentHandles or {},mcmlNode.mGender or YcProfile.GetMyGender());
+    if mcmlNode.mAvatarHandle then
+      AvatarAPI.destroyAvatar(mcmlNode.mAvatarHandle);
+      mcmlNode.mAvatarHandle=nil;
+    end
+    mcmlNode.mAvatarHandle=mcmlNode.mAvatarHandle or AvatarAPI.createAvatar(ctl.GetObject,ctl,mcmlNode.mAvatarComponentHandles);        
+    AvatarAPI.modifyAvatar(mcmlNode.mAvatarHandle,mcmlNode.mAvatarComponentHandles);    
+    mcmlNode.mSkinColour=mcmlNode.mSkinColour or {1,1,1};
+    AvatarAPI.setAvatarSkinColour(mcmlNode.mAvatarHandle,mcmlNode.mSkinColour);
+    mcmlNode.mAvatarComponentColor=mcmlNode.mAvatarComponentColor or {};
+    for key,avatar_component_handle in pairs(mcmlNode.mAvatarComponentHandles) do
+      AvatarAPI.setAvatarComponentColour(mcmlNode.mAvatarHandle,avatar_component_handle,mcmlNode.mAvatarComponentColor[avatar_component_handle]);
+    end
+  end
+end
 
 function pe_mc_player.render_callback(mcmlNode, rootName, bindingContext, _parent, left, top, right, bottom, myLayout, css)
 	-- get user nid
@@ -56,7 +79,7 @@ function pe_mc_player.render_callback(mcmlNode, rootName, bindingContext, _paren
 		autoRotateSpeed = autoRotateSpeed,
 		DefaultCameraObjectDist = mcmlNode:GetNumber("DefaultCameraObjectDist") or 7,
 		DefaultLiftupAngle = mcmlNode:GetNumber("DefaultLiftupAngle") or 0.25,
-		LookAtHeight = mcmlNode:GetNumber("LookAtHeight") or 1.5,
+		LookAtHeight = mcmlNode:GetNumber("LookAtHeight"),
 		FrameMoveCallback = function(ctl)
 			pe_mc_player.OnFrameMove(ctl, mcmlNode);
 		end,
@@ -82,17 +105,21 @@ function pe_mc_player.render_callback(mcmlNode, rootName, bindingContext, _paren
 	if(player and player.GetSkin) then
 		skin = player:GetSkin();
 	end
-	skin = skin or MyCompany.Aries.Game.PlayerController:GetSkinTexture();
-	
-	obj_params.ReplaceableTextures = {[2] = skin };
+	--skin = skin or MyCompany.Aries.Game.PlayerController:GetSkinTexture();
+	if skin then
+    obj_params.ReplaceableTextures = {[2] = skin };
+  end
 	obj_params.facing = 1.57;
 	-- MESH_USE_LIGHT = 0x1<<7: use block ambient and diffuse lighting for this model. 
-	obj_params.Attribute = 128;
+	obj_params.Attribute = 0;
 
+	GameLogic.GetFilters():apply_filters("pe_mc_player_render_callback_obj_params_created", obj_params);
+	
 	mcmlNode.obj_params = obj_params;
 
-	ctl:ShowModel(obj_params);
+	ctl:ShowModel(obj_params,false);
 	pe_mc_player.OnFrameMove(ctl, mcmlNode);
+  _applyAvatar(ctl,mcmlNode);
 end
 
 

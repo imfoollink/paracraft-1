@@ -147,7 +147,9 @@ function EntityTracker:AutoAddEntityToTracker(entity)
 		self:AddEntityToTracker(entity, 80, 3, true);
 	elseif (entity:isa(EntityManager.EntityNPC)) then
 		self:AddEntityToTracker(entity, 80, 3, true);
-	else
+    elseif entity:isa(EntityManager.EntityHomePointOnline) then 
+		self:AddEntityToTracker(entity, 80, 3, true);
+    else
         -- TODO: other types
     end
 end

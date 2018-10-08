@@ -89,13 +89,23 @@ end
 
 function Entity:UpdateEntityActionState()
 	local curAnimId = self:GetAnimId();
-	if(self.lastAnimId ~= curAnimId and curAnimId) then
+	if(self.lastAnimId ~= curAnimId and curAnimId ~= nil) then
 		self.lastAnimId = curAnimId;
 		local obj = self:GetInnerObject();
 		if(obj) then
 			obj:SetField("AnimID", curAnimId);
 		end
 	end
+	local curUpperAnim = self:GetUpperAnim();
+	if(self.upperAnim ~= curUpperAnim and curUpperAnim ~= nil) then
+		self.upperAnim = curUpperAnim;
+		local obj = self:GetInnerObject();
+		if(obj) then
+			obj:SetField("UpperAnimID", curUpperAnim);
+		end
+	end
+
+
 	local curSkinId = self:GetSkinId();
 	if(self.lastSkinId ~= curSkinId and curSkinId) then
 		self.lastSkinId = curSkinId;

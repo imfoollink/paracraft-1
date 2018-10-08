@@ -434,6 +434,8 @@ function NatureV1ChunkGenerator:GenerateOuterLayer(x, y, z, firstBlockHeight, ty
         if (heightPercentage == 0.0 and y > 66) then
             -- Grass on top
             c:SetType(x, y, z, names.Grass, false);
+            c:SetData(x, y, z, math.random(0,3));
+
         elseif (heightPercentage > 0.2) then
             -- Stone
             c:SetType(x, y, z, names.Stone, false);
@@ -451,6 +453,8 @@ function NatureV1ChunkGenerator:GenerateOuterLayer(x, y, z, firstBlockHeight, ty
             c:SetType(x, y, z, names.Snow, false);
             -- Grass under the snow
             c:SetType(x, y - 1, z, names.Grass, false);
+            c:SetData(x, y - 1, z, math.random(0,3));
+            
         elseif (heightPercentage > 0.2) then
             -- Stone
             c:SetType(x, y, z, names.Stone, false);
@@ -610,5 +614,5 @@ function NatureV1ChunkGenerator:GetClassAddress()
 end
 
 function NatureV1ChunkGenerator:IsSupportAsyncMode()
-	return true;
+	return false;
 end

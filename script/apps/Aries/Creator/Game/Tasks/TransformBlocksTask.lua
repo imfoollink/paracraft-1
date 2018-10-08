@@ -28,6 +28,11 @@ local BlockEngine = commonlib.gettable("MyCompany.Aries.Game.BlockEngine")
 local TaskManager = commonlib.gettable("MyCompany.Aries.Game.TaskManager")
 local block_types = commonlib.gettable("MyCompany.Aries.Game.block_types")
 
+NPL.load("(gl)script/ide/math/ShapeAABB.lua");
+local ShapeAABB = commonlib.gettable("mathlib.ShapeAABB");
+NPL.load("(gl)script/ide/math/vector.lua");
+local vector3d = commonlib.gettable("mathlib.vector3d");
+
 local math_floor = math.floor;
 local math_abs = math.abs;
 local TransformBlocks = commonlib.inherit(commonlib.gettable("MyCompany.Aries.Game.Task"), commonlib.gettable("MyCompany.Aries.Game.Tasks.TransformBlocks"));
@@ -47,12 +52,15 @@ function TransformBlocks:Run()
 		
 		GameLogic.PlayAnimation({animationName = "RaiseTerrain",});
 
+		local temp_blocks  = commonlib.clone(self.blocks);
+
 		local final_blocks = {};
 
 		local dx, dy, dz = self:GetDeltaPosition(self.x, self.y, self.z, self.aabb)
 		
 		-- for translation
-		self:DoTranslation(dx,dy,dz, self.blocks, final_blocks);
+		--self:DoTranslation(dx,dy,dz, self.blocks, final_blocks);
+		self:DoTranslation(dx,dy,dz, temp_blocks, final_blocks);
 
 		if(self.rot_axis == "x") then
 			self.rot_x = self.rot_angle or self.rot_x;
@@ -61,18 +69,50 @@ function TransformBlocks:Run()
 		elseif(self.rot_axis == "z") then
 			self.rot_z = self.rot_angle or self.rot_z;
 		end
-		-- for rotation an axis
-		if(self.rot_y and self.rot_y~=0) then
-			self:DoRotation(self.rot_y, "y", self.blocks, final_blocks);
-		elseif(self.rot_x and self.rot_x~=0) then
-			self:DoRotation(self.rot_x, "x", self.blocks, final_blocks);
-		elseif(self.rot_z and self.rot_z~=0) then
-			self:DoRotation(self.rot_z, "z", self.blocks, final_blocks);
+
+		if(#final_blocks ~= 0) then
+			temp_blocks = commonlib.clone(final_blocks);
 		end
-		
+
+		if(#final_blocks ~= 0) then
+			self.aabb = ShapeAABB:new();
+			self.aabb:SetPointAABB(vector3d:new({final_blocks[1][1],final_blocks[1][2],final_blocks[1][3]}));
+			for i = 2, #final_blocks do
+				local b = final_blocks[i];
+				self.aabb:Extend(vector3d:new({b[1], b[2], b[3]}));
+			end		
+		end
+
+
+
+		-- for rotation an axis
+		--if(self.rot_y and self.rot_y~=0) then
+			--self:DoRotation(self.rot_y, "y", self.blocks, final_blocks);
+		--elseif(self.rot_x and self.rot_x~=0) then
+			--self:DoRotation(self.rot_x, "x", self.blocks, final_blocks);
+		--elseif(self.rot_z and self.rot_z~=0) then
+			--self:DoRotation(self.rot_z, "z", self.blocks, final_blocks);
+		--end
+
+		if(self.rot_y and self.rot_y~=0) then
+			self:DoRotation(self.rot_y, "y", temp_blocks, final_blocks);
+		elseif(self.rot_x and self.rot_x~=0) then
+			self:DoRotation(self.rot_x, "x", temp_blocks, final_blocks);
+		elseif(self.rot_z and self.rot_z~=0) then
+			self:DoRotation(self.rot_z, "z", temp_blocks, final_blocks);
+		end
+
+
+		if(#final_blocks ~= 0) then
+			temp_blocks = commonlib.clone(final_blocks);
+		end
+
 		-- for scaling
-		self:DoScaling(self.scalingX or self.scaling, self.scalingY or self.scaling, self.scalingZ or self.scaling, self.blocks, final_blocks);
-		
+		--self:DoScaling(self.scalingX or self.scaling, self.scalingY or self.scaling, self.scalingZ or self.scaling, self.blocks, final_blocks);
+		self:DoScaling(self.scalingX or self.scaling, self.scalingY or self.scaling, self.scalingZ or self.scaling, temp_blocks, final_blocks);
+
+		--temp_blocks = commonlib.clone(final_blocks);
+
 		-- perform translation to final_blocks, by first removing all old blocks and then creating the new ones. 
 		local bRemoveSourceBlocks = (self.operation == "move" or self.operation == "no_clone");
 		self:DoTransform(self.blocks, final_blocks, bRemoveSourceBlocks)
@@ -197,12 +237,12 @@ end
 -- @param aabb: aabb  of source block. 
 -- @param final_blocks: the transformed block output. 
 function TransformBlocks:DoTranslation(dx,dy,dz, blocks, final_blocks)
-	if(dx~=0 or dy~=0 or dz~=0) then
+	-- if(dx~=0 or dy~=0 or dz~=0) then
 		for i = 1, #(blocks) do
 			local b = blocks[i];
 			final_blocks[i] = {b[1]+dx, b[2]+dy, b[3]+dz, b[4], b[5], b[6]};
 		end
-	end
+	-- end
 end
 
 -- rotating blocks with arbitrary angle will result in gaps. 

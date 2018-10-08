@@ -11,104 +11,214 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/Network/TunnelService/TunnelServer.
 local TunnelServer = commonlib.gettable("MyCompany.Aries.Game.Network.TunnelServer");
 -------------------------------------------------------
 ]]
-NPL.load("(gl)script/apps/Aries/Creator/Game/Network/TunnelService/RoomInfo.lua");
-local RoomInfo = commonlib.gettable("MyCompany.Aries.Game.Network.RoomInfo");
 
 local TunnelServer = commonlib.inherit(commonlib.gettable("System.Core.ToolBase"), commonlib.gettable("MyCompany.Aries.Game.Network.TunnelServer"));
 
 local s_singletonServer;
 
+local User = 
+{
+
+	connections = {}, 
+	alive = false,
+	name = nil,
+	nid = nil,
+
+	disconnect = function (self, username)
+		if username then
+			local user = self.connections[username];
+			if user then
+				NPL.activate(self:getAddress(), {type="tunnel_disconnect",target = username,})
+				NPL.activate(user:getAddress(), {type="tunnel_disconnect",target = self.name,})
+
+				self.connections[username] = nil;
+			end	
+		else
+			for k,v in pairs(self.connections) do
+				v:disconnect(self.name);
+			end
+			self.alive = false;
+			NPL.reject(self.nid)
+			LOG.std(nil, "info", "TunnelServer", " %s logout ", self.name);
+		end
+	end,
+	new = function (self, nid, name)
+		local user = commonlib.copy(self);
+		user.nid = nid;
+		user.name = name;
+		user.alive = true;
+
+		return user;
+	end,
+
+	getAddress = function (self)
+		return format("%s:%s", self.nid, "script/apps/Aries/Creator/Game/Network/TunnelService/TunnelClient.lua");
+	end,
+
+	connect = function (self, target)
+		self.connections[target.name] = target;
+		target.connections[self.name] = self;
+	end,
+
+	send = function(self, msg)
+		if not self.alive then
+			return false
+		end
+		if NPL.activate(self:getAddress(), msg) ~= 0 then
+			self:disconnect();
+			return false;
+		end
+		return true;
+	end,
+
+	timeout = function (self)
+		for k,v in pairs(self.connections) do
+			v:send({type="tunnel_timeout",target = self.name,})
+		end
+		--self.alive = false;
+	end
+}
+
+
 function TunnelServer:ctor()
 	s_singletonServer = self;
 	-- mapping from room_key to room_table
-	self.rooms = {};
-	self.userToNid = {};
 	self.nidToUser = {};
+	self.users = {};
+end
+
+function TunnelServer:Init(auth)
+	self.auth = auth;
 	LOG.std(nil, "info", "TunnelServer", "tunnel server is started");
+
+	NPL.load("(gl)script/ide/timer.lua");
+	self.timer = commonlib.Timer:new({callbackFunc = 
+	function ()
+		self:keepAlive();
+	end})
+	self.timer:Change(0,5000);
+
+	return self;
 end
 
--- update and insert room. this function is usually asked by lobbyserver to dynamically allocate a room. 
-function TunnelServer:updateInsertRoom(room_info)
-	if(not room_info) then
-		return;
+function TunnelServer:clear()
+	local k,v  ;
+	for k,v in pairs(self.users) do
+		v:disconnect();
 	end
-	self.rooms[room_info.room_key] = room_info;
 end
 
-function TunnelServer:GetRoom(room_key)
-	return self.rooms[room_key];
-end
-
-function TunnelServer:GetUserNameFromNid(nid)
+function TunnelServer:GetUserFromNid(nid)
 	return self.nidToUser[nid];
 end
 
-function TunnelServer:GetClientAddress(username)
-	local nid = self.userToNid[username];
-	if(nid) then
-		return format("%s:%s", nid, "script/apps/Aries/Creator/Game/Network/TunnelService/TunnelClient.lua");
+function TunnelServer:login(nid, username)
+	local ret = self.auth:login(username);
+	if (not ret) then
+		LOG.std(nil, "info", "TunnelServer", " failed to authenticate %s(%s)  ", username, nid);
+		return 
 	end
+
+	self.users[username] = User:new(nid, username);
+	local user = self.users[username]
+	user.alive = true;
+	user.ping = 0;
+	self.nidToUser[nid] = user;
+
+	LOG.std(nil, "info", "TunnelServer", " %s(%s) login ", username, nid);
+	-- send reply
+	user:send({type="tunnel_login", result = ret})
+end
+
+function TunnelServer:logout(username)
+	self.users[username]:disconnect();
+	self.users[username] = nil;
 end
 
 function TunnelServer:handleReceive(msg)
 	local msg_type = msg.type;
 	local nid = msg.nid or msg.tid;
 	
-	if(not msg_type and msg.room_key and msg.dest) then
+	if(msg.dest) then
 		-- relay message from source to destination on behalf of source user
-		local src_username = self:GetUserNameFromNid(nid);
-		if(not src_username) then
+		local dest = self.users[msg.dest];
+		if(not dest) then
 			return;
 		end
-		local room_key = msg.room_key;
-		local room = self:GetRoom(room_key);
-		if(room) then
-			local dest_username = msg.dest;
-			local user = room:GetUser(dest_username);
-			local dest_addr = self:GetClientAddress(dest_username);
-			if(not dest_addr) then
-				-- TODO: no connection for user,...
-				LOG.std(nil, "info", "TunnelServer", "no connection for user %s in room %s", dest_username, room_key);
-			elseif(not user) then
-				-- TODO: no valid user found,...
-				LOG.std(nil, "info", "TunnelServer", "no valid dest (target) user %s in room %s", dest_username, room_key);
-			else
-				-- relay the message
-				NPL.activate(dest_addr, {room_key = room_key, from = src_username, msg=msg.msg, });
-			end
-		else
-			-- TODO: no room found,...
-			NPL.reject(nid);
-		end
-	elseif(msg_type == "tunnel_login") then
-		local room_key = msg.room_key or "";
-		local room = self:GetRoom(room_key);
-		if(room and msg.username) then
-			local username = msg.username;
-			-- TODO make unique and verify username with the one in the room
-			self.userToNid[username] = nid;
-			self.nidToUser[nid] = username;
-			-- Remove this, since by logic, user should already exist when handling "update_room" message. 
-			-- or should we allow any authenticated client to add users in the room?
-			room:AddUser(username);
-			LOG.std(nil, "info", "TunnelServer", "room: `%s` added client `%s` as %s", room_key, msg.username, nid);
-			-- send reply
-			local dest_addr = self:GetClientAddress(msg.username);
-			if(dest_addr) then
-				NPL.activate(dest_addr, {type="tunnel_login", result = true});
-			end
-		end
-	elseif(msg_type == "update_room" and msg.nid) then
-		-- usually sent from lobby Server to update valid rooms
-		-- TODO: call :updateInsertRoom(room_info);
+		dest:send({from = self.nidToUser[nid].name, msg=msg.msg, })
 	end
+end
+
+function TunnelServer:handleCmdMsg(msg)
+	local msg_type = msg.type;
+	local nid = msg.nid or msg.tid;
+
+	if(msg_type == "tunnel_login") then
+		self:login(nid, msg.username);
+	elseif(msg_type == "tunnel_connect") then
+		local client = self:GetUserFromNid(nid);
+		local hostname = msg.host
+		local host = self.users[hostname];
+		if not client then
+			return 
+		end
+	
+		if client.name == hostname or
+			not self.auth:connect( hostname,client.name) or
+			not host or
+			not host.alive or 
+			not client.alive then
+			client:send({type="tunnel_connect" , result = false})
+			LOG.std(nil, "info", "TunnelServer", "%s is not allowed to connect to %s", client.name, hostname);
+			return
+		end
+
+
+		host:connect(client);
+
+		client:send({type="tunnel_connect" , result = true})
+
+	elseif (msg_type == "tunnel_logout") then
+		local user = self:GetUserFromNid(nid);
+		if user then
+			self:logout(user.name)
+		end
+	elseif msg_type == "tunnel_ping" then
+		local user = self.users[msg.username];
+		if user then
+			user.ping = 0;
+			user.alive = true;
+		end
+	end
+end
+
+function TunnelServer:keepAlive()
+
+	for k,v in pairs(self.users) do
+		echo(v)
+		if v.alive then
+			if v.ping > 5 then
+				v:disconnect();
+			elseif v.ping > 1 then
+				v:timeout();
+				LOG.std(nil, "info", "TunnelServer", "%s may not alive", k);
+			end
+			v.ping = v.ping + 1;
+			v:send({type = "tunnel_ping"});
+		end
+	end
+
 end
 
 local function activate()
 	local msg = msg;
-	-- echo({"TunnelServer:receive--------->", msg})
 	if(s_singletonServer and msg) then
-		s_singletonServer:handleReceive(msg)
+		if (msg.type) then
+		--echo({"TunnelServer:receive--------->", msg})
+			s_singletonServer:handleCmdMsg(msg)
+		else
+			s_singletonServer:handleReceive(msg)
+		end
 	end
 end
 NPL.this(activate);

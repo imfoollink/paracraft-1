@@ -85,11 +85,11 @@ function EnterTextDialog.ShowPage(text, OnClose, default_text, type_, options, s
 			isTopLevel = true,
 			---app_key = MyCompany.Aries.Creator.Game.Desktop.App.app_key, 
 			directPosition = true,
-				align = showParams.align or "_ct",
-				x = showParams.x or -200,
-				y = showParams.y or -150,
-				width = showParams.width or 400,
-				height = showParams.height or 400,
+			align = showParams.align or "_ct",
+			x = showParams.x or -240,
+			y = showParams.y or -104,
+			width = showParams.width or 479,
+			height = showParams.height or 207,
 		};
 	System.App.Commands.Call("File.MCMLWindowFrame", params);
 

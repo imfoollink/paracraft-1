@@ -466,7 +466,7 @@ function SelectModel:keyPressEvent(event)
 	elseif(dik_key == "DIK_DELETE" or dik_key == "DIK_DECIMAL")then
 		SelectModel.DoRemove();
 	else
-		self:GetSceneContext():keyPressEvent(event);
+		-- self:GetSceneContext():keyPressEvent(event);
 	end	
 end
 
@@ -487,6 +487,10 @@ end
 ------------------------
 local page;
 function SelectModel.ShowPage()
+	NPL.load("(gl)script/Truck/Utility/CommonUtility.lua");
+	local CommonUtility = commonlib.gettable("Mod.Truck.Utility.CommonUtility");
+
+	if CommonUtility:IsMobilePlatform() then
 	System.App.Commands.Call("File.MCMLWindowFrame", {
 			url = "script/apps/Aries/Creator/Game/Tasks/SelectModelTask.html", 
 			name = "SelectModelTask.ShowPage", 
@@ -501,9 +505,28 @@ function SelectModel.ShowPage()
 				align = "_lt",
 				x = 0,
 				y = 160,
-				width = 128,
+				width = 256,
 				height = 512,
 		});
+	else
+	System.App.Commands.Call("File.MCMLWindowFrame", {
+			url = "script/apps/Aries/Creator/Game/Tasks/SelectModelTask.PC.html", 
+			name = "SelectModelTask.ShowPage", 
+			app_key = MyCompany.Aries.Creator.Game.Desktop.App.app_key, 
+			isShowTitleBar = false,
+			DestroyOnClose = true, -- prevent many ViewProfile pages staying in memory
+			style = CommonCtrl.WindowFrame.ContainerStyle,
+			-- zorder = 1,
+			allowDrag = true,
+			click_through = true,
+			directPosition = true,
+				align = "_ct",
+				x = -360,
+				y = -170,
+				width = 258,
+				height = 367,
+		});
+	end
 	MyCompany.Aries.Creator.ToolTipsPage.ShowPage(false);
 end
 

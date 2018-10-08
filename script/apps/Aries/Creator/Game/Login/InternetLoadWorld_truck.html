@@ -1,0 +1,92 @@
+<!-- "script/apps/Aries/Creator/Game/Login/InternetLoadWorld_truck.html" -->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>2015.5.13</title>
+</head>
+<body>
+    <pe:mcml>
+        <script type="text/npl">
+            <![CDATA[
+            NPL.load("(gl)script/ide/AudioEngine/AudioEngine.lua");
+            NPL.load("(gl)script/Truck/Game/World/TruckWorldCommon.lua");
+           
+            local AudioEngine = commonlib.gettable("AudioEngine");
+            local page = document:GetPageCtrl();
+            local MainLogin = commonlib.gettable("MyCompany.Aries.Game.MainLogin");
+            local TruckWorldCommon = commonlib.gettable("Mod.Truck.Game.World.TruckWorldCommon")
+
+            function EnterCreateGame()
+            AudioEngine.PlayUISound("btn_confirm");
+            page:CloseWindow();
+            
+            -- MainLogin:next_step({IsLoadMainWorldRequested = true});
+            --NPL.load("(gl)script/Truck/CreateModeBackgroundPage.lua");
+            --local CreateModeBackgroundPage = commonlib.gettable("MyCompany.Aries.Game.MainLogin.CreateModeBackgroundPage");
+            --CreateModeBackgroundPage.ShowPage();
+
+
+            NPL.load("(gl)script/Truck/Game/ModuleManager.lua");
+            local ModuleManager = commonlib.gettable("Mod.Truck.Game.ModuleManager");
+            ModuleManager.startModule("SelectPlanet");
+            
+            end
+
+            function EnterExploreGame()
+                TruckWorldCommon.OpenWorld("worlds/DesignHouse/Explore", nil, true);
+            end
+
+            function EnterConnectGame()
+                AudioEngine.PlayUISound("btn_confirm");
+                --NPL.load("(gl)script/Truck/ServerHallBGPage.lua");
+                --local ServerHallBGPage = commonlib.gettable("MyCompany.Aries.Game.MainLogin.ServerHallBGPage")
+                --ServerHallBGPage.ShowPage()
+
+                NPL.load("(gl)script/Truck/Game/ModuleManager.lua");
+                local ModuleManager = commonlib.gettable("Mod.Truck.Game.ModuleManager");
+                ModuleManager.startModule("Online");
+
+                page:CloseWindow();
+
+            end
+
+            function EnterGuideWorld()
+                page:CloseWindow();
+                AudioEngine.PlayUISound("btn_start");
+                local Settings = commonlib.gettable("Mod.Truck.Settings");
+
+                --TruckWorldCommon.OpenWorld(Settings.guide_path, nil, true);
+
+                NPL.load("(gl)script/Truck/Game/ModuleManager.lua");
+                local ModuleManager = commonlib.gettable("Mod.Truck.Game.ModuleManager");
+                ModuleManager.startModule("GuideWorldPlay", {planetPath=Settings.guide_path, input="Guide"})
+            end
+
+            function OnMouseEnter(name, mcmlNode)
+                AudioEngine.PlayUISound("btn_show");
+            end
+
+            function ShowWelcome()
+                NPL.load("(gl)script/Truck/Network/YcProfile.lua");
+                local YcProfile = commonlib.gettable("Mod.Truck.Network.YcProfile");
+                local my_info = YcProfile.GetUserInfo();
+                if(my_info)then
+                    local s = string.format(TL"欢迎%s(%d)",my_info.nick_name,my_info.user_id);
+                    return s;
+                end
+            end
+
+            ]]>
+        </script>
+        <pe:container alignment="_fi" width="100%" height="100%" style="background:url(gameassets/textures/ui_03_planet/SelectModeBG.jpg);">
+        </pe:container>
+        <pe:container alignment="_ct" style="position:relative;;margin-left:-465px;margin-top:-136px;width:900px;height:450px;background:">
+            <input type="button" name="enterCreateGame" onclick="EnterCreateGame" onmouseenter="OnMouseEnter" style="texpack:addr_by_id(SelectModeUI->2.png);position:relative;margin-left:0px;" />
+            <input type="button" name="enterConnectGame" onclick="EnterConnectGame" onmouseenter="OnMouseEnter" ontouchmove="OnTouch" style="texpack:addr_by_id(SelectModeUI->1.png);position:relative;margin-left:480px;" />
+        </pe:container>
+        <pe:container alignment="_rb" style="position:relative;background:;margin-right:0px;margin-bottom:0px;width:65px;height:72px;">
+            <input type="button" name="enterGuideWorld" tooltip='<%=TL"新手引导教程"%>' onclick="EnterGuideWorld" onmouseenter="OnMouseEnter"  style="background:url(gameassets/textures/ui_12_guide/guideUI_32bits.png#2 2 65 72);position:relative;width:65px;height:72px;" />
+        </pe:container>
+    </pe:mcml>
+</body>
+</html

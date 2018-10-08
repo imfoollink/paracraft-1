@@ -19,6 +19,9 @@ end
 function PacketLoginClient:Init(username, password)
 	self.username = username;
 	self.password =	password;
+
+	GameLogic.GetFilters():apply_filters("packet_login_client_inited", self);
+
 	return self;
 end
 

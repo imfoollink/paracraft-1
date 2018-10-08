@@ -10,11 +10,15 @@ local RoomInfo = commonlib.gettable("MyCompany.Aries.Game.Network.RoomInfo");
 local room_info = RoomInfo:new():init(room_key)
 -------------------------------------------------------
 ]]
-local RoomInfo = commonlib.inherit(nil, commonlib.gettable("MyCompany.Aries.Game.Network.RoomInfo"));
+NPL.load("(gl)script/apps/Aries/Creator/Game/Network/TunnelService/Authenticator.lua");
+local Authenticator = commonlib.gettable("MyCompany.Aries.Game.Network.Authenticator");
 
+local RoomInfo = commonlib.inherit(Authenticator, commonlib.gettable("MyCompany.Aries.Game.Network.RoomInfo"));
+local Room = commonlib.gettable("MyCompany.Aries.Game.Network.Room")
 function RoomInfo:ctor()
 	-- array of all users. 
-	self.users = commonlib.ArrayMap:new();
+	self.HostToRoom = {}
+	self.KeyToRoom = {}
 end
 
 local next_room_key = 0;
@@ -27,31 +31,73 @@ end
 
 
 -- @param room_key: if nil, we will dynamically generate a room key
-function RoomInfo:Init(room_key)
+function RoomInfo:Init(room_key, host)
 	self.room_key = room_key or RoomInfo.GenerateRoomKey();
+	self.host = hostname;
+	self:AddUser(host)
 	return self;
 end
 
-function RoomInfo:AddUser(username)
+function RoomInfo:createRoom(room_key, host)
+	local room = Room:new(room_key, host);
+	self.HostToRoom[host] = room;
+	self.KeyToRoom[room_key] = room;
+end
+
+function RoomInfo:destroyRoom(room_key)
+	local room = self:getRoom(room_key);
+	if (not room) then
+		return
+	end
+
+	self.HostToRoom[room.host] = nil;
+	self.KeyToRoom[room_key] = nil;
+end
+
+function RoomInfo:getRoom(room_key)
+	return self.KeyToRoom[room_key];
+end
+
+function RoomInfo:getRoomByHost(host)
+	return self.HostToRoom[host];
+end
+
+function RoomInfo:login(user)
+	--[[
+	if isInBanList then 
+		return false
+	end
+	]]
+	return true;
+end
+
+function RoomInfo:connect(host, guest)
+	local room = self:getRoomByHost(host);
+	if (room) then
+		return room:getUser(guest) ~= nil;
+	end
+	return false;
+end
+
+
+function Room:new(key, host)
+	local room = commonlib.clone(self);
+	room.room_key = key;
+	room.host = host
+	room.users = commonlib.ArrayMap:new();
+	return room;
+end
+
+function Room:addUser(username)
 	self.users:add(username, {username = username, last_tick=0});
 end
 
-function RoomInfo:GetUser(username)
-	if(username == "_admin") then
-		return self.users:at(1);
-	end
+function Room:getUser(username)
 	return self.users:get(username);
 end
 
-
-function RoomInfo:RemoveUser(username)
+function Room:removeUser(username)
 	self.users:remove(username);
 end
 
--- if a user does not send any message in certain time, we will need to time out and remove the user. 
-function RoomInfo:CheckTimeout()
-	-- check time out
-	for key, room_info in self.users:pairs() do
-		
-	end
-end
+

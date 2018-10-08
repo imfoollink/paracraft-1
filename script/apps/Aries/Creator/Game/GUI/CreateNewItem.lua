@@ -54,8 +54,8 @@ function CreateNewItem.ShowPage(itemStackArray, OnClose)
 				align = "_lt",
 				x = x,
 				y = y,
-				width = 400,
-				height = 400,
+				width = 240,
+				height = 100,
 		};
 	System.App.Commands.Call("File.MCMLWindowFrame", params);
 	

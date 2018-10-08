@@ -448,6 +448,105 @@ function ChatWindow.FilterURL(words)
 	return words;
 end
 
+local function TruckDrawTextNodeHandlerFilter(text,_parent,treeNode)
+  NPL.load("(gl)script/Truck/Utility/ChatCoder.lua");
+  NPL.load("(gl)script/Truck/Network/YcProfile.lua");
+  local YcProfile = commonlib.gettable("Mod.Truck.Network.YcProfile");
+  local ChatCoder=commonlib.gettable("Truck.Utility.ChatCoder");
+  local decoded=ChatCoder.decode(text);
+  if decoded then
+    local mcml_str="";
+    if decoded.mFromUserID then
+      mcml_str=mcml_str..[[<img src="]]..YcProfile.GetCharacterHeadIconById(decoded.mFromUserAvatarID)..[[" style="width:90px;height:90px"></img>]];
+    elseif decoded.mFromName then
+      local tex_name="NewQuickEditUI2->59.png";
+      if "系统"==decoded.mFromName then
+        tex_name="NewQuickEditUI2->59.png";
+      end
+      mcml_str=mcml_str..[[<img style="texpack:addr_by_id(]]..tex_name..[[);width:90px;height:90px"></img>]];
+    end
+    local tex_name="NewFriendInfoUI->40.png";
+    if not decoded.mFromUserID or decoded.mFromUserID==YcProfile.GetMyInfo().user_id then
+      tex_name="NewFriendInfoUI->40.png";
+    else
+      tex_name="NewFriendInfoUI->39.png";
+    end
+    mcml_str=mcml_str..[[<img style="texpack:addr_by_id(]]..tex_name..[[)"></img>]];
+    mcml_str=mcml_str..[[<div style="margin-left:100px;margin-top:-95px;color:#62677b;base-font-size:30px;font-size:30px">]];
+    local name;
+    if decoded.mFromUserID then
+      name=decoded.mFromUserNickName;
+    elseif decoded.mFromName then
+      name=decoded.mFromName;
+    end
+    mcml_str=mcml_str..name;
+    mcml_str=mcml_str.."</div>";
+    mcml_str=mcml_str..[[<div style="color:ffffff;margin-left:100px;margin-top:-50px;width:400px;base-font-size:30px;font-size:30px">]];
+    mcml_str=mcml_str..decoded.mText;
+    mcml_str=mcml_str.."</div>";
+    mcmlStr=mcml_str;
+    if(mcmlStr ~= nil) then
+      local height = 12; -- just big enough
+      local nodeWidth = treeNode.TreeView.ClientWidth;
+      local xmlRoot = ParaXML.LuaXML_ParseString(mcmlStr);
+      if(type(xmlRoot)=="table" and table.getn(xmlRoot)>0) then
+        local xmlRoot = Map3DSystem.mcml.buildclass(xmlRoot);
+                
+        local myLayout = Map3DSystem.mcml_controls.layout:new();
+        myLayout:reset(0, 0, nodeWidth-5, height);
+        Map3DSystem.mcml_controls.create("bbs_lobby", xmlRoot, nil, _parent, 0, 0, nodeWidth-5, height,nil, myLayout);
+        local usedW, usedH = myLayout:GetUsedSize()
+        if(usedH>height) then
+          return usedH;
+        end
+      end
+    end
+  end
+end
+
+local function TruckDrawTextNodeHandlerFilter2(text,_parent,treeNode)
+  NPL.load("(gl)script/Truck/Utility/ChatCoder.lua");
+  NPL.load("(gl)script/Truck/Network/YcProfile.lua");
+  local YcProfile = commonlib.gettable("Mod.Truck.Network.YcProfile");
+  local ChatCoder=commonlib.gettable("Truck.Utility.ChatCoder");
+  local decoded=ChatCoder.decode(text);
+  if decoded then
+    local mcml_str="";
+    -- mcml_str=mcml_str..[[<div style="margin-left:5px;margin-top:6px;color:#ffffff;base-font-size:26px;font-size:26px">]];
+    local name;
+    if decoded.mFromUserID then
+      mcml_str=mcml_str..[[<div style="margin-left:5px;margin-top:-5px;color:#ffffff;base-font-size:20px;font-size:20px">]];
+      name=decoded.mFromUserNickName;
+    elseif decoded.mFromName then
+      mcml_str=mcml_str..[[<div style="margin-left:5px;margin-top:-5px;color:#FFFF99;base-font-size:20px;font-size:20px">]];
+      name=decoded.mFromName;
+    end
+    mcml_str=mcml_str.."["..name.."] ";
+    -- mcml_str=mcml_str.."</div>";
+    -- mcml_str=mcml_str..[[<div style="color:ffffff;position:relative;margin-left:100px;margin-top:-40px;width:400px;base-font-size:26px;font-size:26px">]];
+    mcml_str=mcml_str..decoded.mText;
+    mcml_str=mcml_str.."</div>";
+    mcmlStr=mcml_str;
+    if(mcmlStr ~= nil) then
+      local height = 12; -- just big enough
+      local nodeWidth = treeNode.TreeView.ClientWidth;
+      local xmlRoot = ParaXML.LuaXML_ParseString(mcmlStr);
+      if(type(xmlRoot)=="table" and table.getn(xmlRoot)>0) then
+        local xmlRoot = Map3DSystem.mcml.buildclass(xmlRoot);
+                
+        local myLayout = Map3DSystem.mcml_controls.layout:new();
+        myLayout:reset(0, 0, nodeWidth-5, height);
+        Map3DSystem.mcml_controls.create("bbs_lobby", xmlRoot, nil, _parent, 0, 0, nodeWidth-5, height,nil, myLayout);
+        local usedW, usedH = myLayout:GetUsedSize()
+        if(usedH>height) then
+          return usedH;
+        end
+        return height;
+      end
+    end
+  end
+end
+
 -- render callback for each text node in tree view. 
 function ChatWindow.DrawTextNodeHandler(_parent, treeNode)
 	if(_parent == nil or treeNode == nil) then
@@ -494,7 +593,12 @@ function ChatWindow.DrawTextNodeHandler(_parent, treeNode)
 	if(chatdata.is_direct_mcml) then
 		words = chatdata.words or "";
 	end
-	
+  
+  local filter_ret=TruckDrawTextNodeHandlerFilter2(words,_parent,treeNode);
+  if filter_ret then
+    return filter_ret;
+  end
+  	
 	local world_info = WorldManager:GetCurrentWorld()
 	if(world_info.disable_arena_talk) then
 		local player_side = BattlefieldClient:GetPlayerSide(chatdata.from);

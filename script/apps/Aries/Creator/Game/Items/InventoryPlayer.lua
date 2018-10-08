@@ -231,6 +231,8 @@ function InventoryPlayer:SetItemByBagPos(bag_pos, block_id, count, item_stack)
 		if(last_block_id == block_id and (not last_item or last_item.count == count)) then
 			-- do nothing if nothing is changed
 		else
+			self.last_block_inhand_id = last_block_id;
+			self:OnInventoryChanged();-- notify if move items
 			if(bag_pos == self:GetHandToolIndex()) then
 				if(last_block_id ~= block_id) then
 					self:NotifyBlockInHandChanged(last_block_id, block_id);
@@ -257,7 +259,7 @@ end
 
 -- add item stack to inventory
 function InventoryPlayer:AddItemToInventory(item_stack, from_slot_id)
-	local isPicked, slot_index = self:AddItem(item_stack, from_slot_id, self.max_pick_item_count);
+	local isPicked, slot_index = self:AddItem(item_stack, from_slot_id or 1, self.max_pick_item_count);
 
 	self:NotifySlotChanged(slot_index, nil, item_stack.id);
 	return isPicked, slot_index;

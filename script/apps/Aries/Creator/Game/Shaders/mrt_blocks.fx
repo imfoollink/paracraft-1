@@ -2,7 +2,7 @@
 // Date: 2013/10/4
 // Desc: multiple render target block rendering shaders
 // Some of its ideas are borrowed from sonic ether's unbelievable shaders. 
-
+#include "CommonFunction.fx"
 #define ALPHA_TESTING_REF  0.95
 
 /** undefine to use linear torch light, otherwise it is power */
@@ -131,10 +131,8 @@ BasicBlockVSOut BasicBlockVS(	float4 position	: POSITION,
 	float sun_light_strength = color.x;
 	
 	// apply AO shadow
-	output.color.xyz = color.www;
-	output.color.xyz *= color2.rgb;
-
-	output.color.w = 1;
+	output.color.xyz = color2.rgb;
+	output.color.w = color.w<1?0:1;
 
 	// block category id
 	output.depth.r = color.z;
@@ -152,8 +150,10 @@ BlockPSOut BasicBlockPS(BasicBlockVSOut input)
 {
 	BlockPSOut o;
 	float4 albedoColor = tex2D(tex0Sampler,input.texcoord);
-	o.Color = albedoColor * input.color;
-	o.BlockInfo = float4(input.depth.rgb, 1);
+  albedoColor.rgb=gammaCorrectRead(albedoColor.rgb);
+	o.Color.rgb = albedoColor.rgb * input.color.rgb;
+  o.Color.a=albedoColor.a;
+	o.BlockInfo = float4(input.depth.rgb, input.color.w);
 	o.Depth = float4(input.depth.a,0,0,1);
 	o.Normal = float4(input.normal.xyz, 1.0);
 	return o;
@@ -235,9 +235,8 @@ BasicBlockVSOut TransparentEntityVS(	float4 position	: POSITION,
 	float sun_light_strength = color.x;
 	
 	// apply AO shadow
-	output.color.xyz = color.www;
-	output.color.xyz *= color2.rgb;
-	output.color.w = 1;
+	output.color.xyz = color2.rgb;
+	output.color.w = color.w<1?0:1;
 
 	// block id
 	output.depth.r = color.z; 
@@ -257,9 +256,11 @@ BlockPSOut TransparentEntityPS(BasicBlockVSOut input)
 {
 	BlockPSOut o;
 	float4 albedoColor = tex2D(tex0Sampler,input.texcoord);
+  albedoColor.rgb=gammaCorrectRead(albedoColor.rgb);
 	clip(albedoColor.w-ALPHA_TESTING_REF);
-	o.Color = albedoColor * input.color;
-	o.BlockInfo = float4(input.depth.rgb, 1);
+	o.Color.rgb = albedoColor.rgb * input.color.rgb;
+  o.Color.a=albedoColor.a;
+	o.BlockInfo = float4(input.depth.rgb, input.color.w);
 	o.Depth = float4(input.depth.a,0,0,1);
 	o.Normal = float4(input.normal.xyz, 1);
 	return o;
@@ -332,7 +333,7 @@ WaterBlockVSOut WaterVS(	float4 position	: POSITION,
 	float3 world_pos = vWorldPos.xyz + position.xyz * BLOCK_SIZE;
 
 	// convert to 60FPS ticks
-	float worldTime = g_parameter0.x / 60;
+	float worldTime = g_parameter0.x / 60 * 3.14159265358979323846264;
 
 #ifdef WATER_USEBUMPMAP
 	// zw is normal map texture coordinates
@@ -387,6 +388,7 @@ BlockPSOut WaterPS(WaterBlockVSOut input)
 {
 	BlockPSOut o;
 	float4 albedoColor = tex2D(tex0Sampler,input.texcoord.xy);
+  albedoColor.rgb=gammaCorrectRead(albedoColor.rgb);
 	o.Color = albedoColor * input.color;
 	o.BlockInfo = float4(input.depth.rgb, 1);
 	o.Depth = float4(input.depth.a,0,0,1);
@@ -496,6 +498,7 @@ BlockPSOut BumpBlockPS(BumpBlockVSOut input)
 {
 	BlockPSOut o;
 	float4 albedoColor = tex2D(tex0Sampler, input.texcoord);
+  albedoColor.rgb=gammaCorrectRead(albedoColor.rgb);
 	o.Color = albedoColor * input.color;
 	o.BlockInfo = float4(input.depth.rgb, 1);
 	o.Depth = float4(input.depth.a, 0, 0, 1);
@@ -528,6 +531,58 @@ void VertShadow(	float4 position	: POSITION,
                  out float4 oPos	: POSITION,
                  out float4	outTex	: TEXCOORD0)
 {
+	// category id for block types 
+	int category_id = (int)(color.z * 255.0 + 0.4);
+
+	// convert to 60FPS ticks
+	float worldTime = g_parameter0.x / 60 * 3.14159265358979323846264;
+	// usually 0
+	float rainStrength = g_parameter0.y;
+
+	float3 world_pos = vWorldPos.xyz + position.xyz * BLOCK_SIZE;
+#ifdef WAVING_GRASS	
+	
+	//Grass//
+	if(	category_id == 31 && texcoord.y < 0.15)
+	{
+		float speed = 8.0;
+		
+		float magnitude = sin((worldTime / (28.0)) + world_pos.x + world_pos.z) * 0.1 + 0.1;
+		float d0 = sin(worldTime / (122.0 * speed)) * 3.0 - 1.5 + world_pos.z;
+		float d1 = sin(worldTime / (152.0 * speed)) * 3.0 - 1.5 + world_pos.x;
+		float d2 = sin(worldTime / (122.0 * speed)) * 3.0 - 1.5 + world_pos.x;
+		float d3 = sin(worldTime / (152.0 * speed)) * 3.0 - 1.5 + world_pos.z;
+		position.x += sin((worldTime / (28.0 * speed)) + (world_pos.x + d0) * 0.1 + (world_pos.z + d1) * 0.1) * magnitude * (1.0f + rainStrength * 1.4f);
+		position.z += sin((worldTime / (28.0 * speed)) + (world_pos.z + d2) * 0.1 + (world_pos.x + d3) * 0.1) * magnitude * (1.0f + rainStrength * 1.4f);
+
+		//small leaf movement//
+		speed = 0.8;
+		
+		magnitude = (sin(((world_pos.y + world_pos.x)/2.0 + worldTime / ((28.0)))) * 0.05 + 0.15) * 0.4;
+		d0 = sin(worldTime / (112.0 * speed)) * 3.0 - 1.5;
+		d1 = sin(worldTime / (142.0 * speed)) * 3.0 - 1.5;
+		d2 = sin(worldTime / (112.0 * speed)) * 3.0 - 1.5;
+		d3 = sin(worldTime / (142.0 * speed)) * 3.0 - 1.5;
+		position.x += sin((worldTime / (18.0 * speed)) + (-world_pos.x + d0)*1.6 + (world_pos.z + d1)*1.6) * magnitude * (1.0f + rainStrength * 1.7f);
+		position.z += sin((worldTime / (18.0 * speed)) + (world_pos.z + d2)*1.6 + (-world_pos.x + d3)*1.6) * magnitude * (1.0f + rainStrength * 1.7f);
+		position.y += sin((worldTime / (11.0 * speed)) + (world_pos.z + d2) + (world_pos.x + d3)) * (magnitude/3.0) * (1.0f + rainStrength * 1.7f);
+	}
+#endif
+
+#ifdef WAVING_LEAVES
+	//Leaves//
+	if (category_id == 18) {
+		float speed = 1.0;
+		float magnitude = (sin((world_pos.y + world_pos.x + worldTime / ((28.0) * speed))) * 0.15 + 0.15) * 0.20;
+		float d0 = sin(worldTime / (112.0 * speed)) * 3.0 - 1.5;
+		float d1 = sin(worldTime / (142.0 * speed)) * 3.0 - 1.5;
+		float d2 = sin(worldTime / (132.0 * speed)) * 3.0 - 1.5;
+		float d3 = sin(worldTime / (122.0 * speed)) * 3.0 - 1.5;
+		position.x += sin((worldTime / (18.0 * speed)) + (-world_pos.x + d0)*1.6 + (world_pos.z + d1)*1.6) * magnitude * (1.0f + rainStrength * 1.0f);
+		position.z += sin((worldTime / (17.0 * speed)) + (world_pos.z + d2)*1.6 + (-world_pos.x + d3)*1.6) * magnitude * (1.0f + rainStrength * 1.0f);
+		position.y += sin((worldTime / (11.0 * speed)) + (world_pos.z + d2) + (world_pos.x + d3)) * (magnitude/2.0) * (1.0f + rainStrength * 1.0f);
+	}
+#endif	
     oPos = mul( position, mWorldViewProj );
 	outTex.xy = texcoord;
     outTex.zw = oPos.zw;

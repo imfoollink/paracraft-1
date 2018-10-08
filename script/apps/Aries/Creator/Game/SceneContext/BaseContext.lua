@@ -154,10 +154,11 @@ end
 
 -- return true if handled
 function BaseContext:handleHookedMouseEvent(event)
+	--[[
 	if(ModManager:handleMouseEvent(event)) then
 		return true;
 	end
-
+	]]
 	if(self:handleItemMouseEvent(event)) then
 		return true;
 	end
@@ -519,9 +520,11 @@ end
 
 -- virtual: return true if handled
 function BaseContext:handleHookedKeyEvent(event)
+    --[[
 	if(ModManager:handleKeyEvent(event)) then
 		return true;
 	end
+    ]]
 
 	if(self:handleItemKeyEvent(event)) then
 		return true;
@@ -900,14 +903,19 @@ function BaseContext:HandleGlobalKey(event)
 		event:accept();
 	elseif(dik_key == "DIK_RETURN") then
 		--System.App.Commands.Call(System.App.Commands.GetDefaultCommand("EnterChat"));
-		NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/ChatSystem/ChatWindow.lua");
-		MyCompany.Aries.ChatSystem.ChatWindow.ShowAllPage(true);
+		-- NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/ChatSystem/ChatWindow.lua");
+		-- MyCompany.Aries.ChatSystem.ChatWindow.ShowAllPage(true);
+
+        NPL.load("(gl)script/Truck/ChatWindow.lua");
+        local ChatWindow = commonlib.gettable("MyCompany.Aries.ChatSystem.ChatWindow");
+        ChatWindow.ShowPage();
+
 		event:accept();
-	elseif(dik_key == "DIK_SLASH") then
+--[[	elseif(dik_key == "DIK_SLASH") then
 		NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/ChatSystem/ChatWindow.lua");
 		MyCompany.Aries.ChatSystem.ChatWindow.ShowAllPage(true);
 		MyCompany.Aries.ChatSystem.ChatEdit.SetText("/");
-		event:accept();
+		event:accept();--]]
 	elseif(dik_key == "DIK_GRAVE") then
 		NPL.load("(gl)script/apps/Aries/Creator/Game/World/CameraController.lua");
 		local CameraController = commonlib.gettable("MyCompany.Aries.Game.CameraController")

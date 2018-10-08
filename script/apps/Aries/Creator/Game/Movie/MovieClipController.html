@@ -56,50 +56,85 @@ function OnClickEmptySlot(mcmlNode)
 end
 
 ]]></script>
-<aries:window mode="thin" style="width:200px;" title='<%=L"电影片段"%>' onclose="MovieClipController.OnClose">
-    <pe:if condition='<%=not MovieClipController.IsPlayingMode()%>'>
-    <div>
-        <div>
-            <div class="mc_item" style="float:left;width: 34px; height: 34px;">
-                <input type="button" zorder="1" name="AddNPC" value="+" tooltip='<%=L"添加演员"%>' style="margin-left:4px;margin-top:4px;width:26px;height:26px;" class="mc_light_grey_button_with_fillet" onclick="MovieClipController.OnClickAddNPC()"/>
-            </div>
-            <div class="mc_item" style="float: left; width: 34px; height: 34px;">
-                <input type="button" zorder="1" name="godview" tooltip='<%=L"主角"%>' style="margin-left: 1px; margin-top: 1px; width: 32px; height: 32px; background: url(Texture/blocks/items/ts_char_off.png); " onclick="MovieClipController.OnClickGodMode()"/>
-            </div>
-        </div>
-        <pe:gridview name="InventoryItems" style="height:104px;" VerticalScrollBarStep="34" DataSource="<%=DS_Actor_Inventory%>" CellPadding="0" DefaultNodeHeight = "34" ItemsPerLine="5" AllowPaging="false" RememberScrollPos="true" RememberLastPage="true" pagesize="256">
+
+<pe:if condition='<%=not MovieClipController.IsPlayingMode()%>'>
+    <pe:container alignment="_rb" style="margin-left:;margin-top:;texpack:addr_by_id(movieedit_PC->13.png);">
+
+        <input type="button" name="close" style="margin-left:330px;margin-top:16px;texpack:addr_by_id(movieedit_PC->22.png);" onclick="MovieClipController.OnClose()" />
+    
+        <input type="button" name="AddNPC"  tooltip='<%=TL"添加演员"%>' style="margin-left:10px;margin-top:20px;texpack:addr_by_id(movieedit_PC->07.png);" onclick="MovieClipController.OnClickAddNPC()"/>
+        <input type="button" name="godview" tooltip='<%=TL"控制主角"%>' style="margin-left:20px;margin-top:28px;texpack:addr_by_id(movieedit_PC->12.png);" onclick="MovieClipController.OnClickGodMode()"/>
+
+        <pe:gridview name="InventoryItems" style="margin-left:7px;margin-top:10px;height:200px;" VerticalScrollBarStep="64" DataSource="<%=DS_Actor_Inventory%>" CellPadding="0" DefaultNodeHeight="67" ItemsPerLine="5" AllowPaging="false" RememberScrollPos="true" RememberLastPage="true" pagesize="256">
             <Columns>
+            <div style="margin-left:3px">
                 <pe:if condition='<%=IsSelectedActor(Eval("slotNumber"))%>'>
-                    <div style="background:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#236 122 26 26:1 1 1 1)">
-                        <pe:mc_slot switchTouchButton="true" ContainerView='<%=MovieClipController.GetActorInventoryView()%>' bagpos ='<%=Eval("slotNumber")%>' style="margin:1px;width:32px;height:32px;"></pe:mc_slot>
+                    <div style="texpack:addr_by_id(movieedit_PC->09.png);width:64px;height:64px;">
+                        <pe:mc_slot switchTouchButton="true" ContainerView='<%=MovieClipController.GetActorInventoryView()%>' bagpos ='<%=Eval("slotNumber")%>' style="margin:1px;width:64px;height:64px;"></pe:mc_slot>
                     </div>
                 </pe:if>
                 <pe:if condition='<%=not IsSelectedActor(Eval("slotNumber"))%>'>
-                    <div class="mc_item">
-                        <pe:mc_slot switchTouchButton="true" class="mc_slot" onclick_empty="OnClickEmptySlot" ContainerView='<%=MovieClipController.GetActorInventoryView()%>' bagpos ='<%=Eval("slotNumber")%>' style="margin:1px;width:32px;height:32px;"></pe:mc_slot>
+                    <div style="texpack:addr_by_id(movieedit_PC->08.png);width:64px;height:64px;">
+                        <pe:mc_slot switchTouchButton="true" class="mc_slot" onclick_empty="OnClickEmptySlot" ContainerView='<%=MovieClipController.GetActorInventoryView()%>' bagpos ='<%=Eval("slotNumber")%>' style="margin:1px;width:60px;height:64px;"></pe:mc_slot>
                     </div>
                 </pe:if>
-			</Columns>
+            </div>
+            </Columns>
         </pe:gridview>
-    </div>
-    <div style="margin-top:0px;">
-        <input type="button" name="addkeyframe" tooltip='<%=L"左键:加入关键帧(K)\n右键:锁定/解锁角色(L)"%>' style="margin-left: 0px; width: 32px; height: 32px; background: url(Texture/Aries/Creator/player/key_off.png)" onclick="MovieClipController.OnClickAddKeyFrameButton()"/>
-        <input type="button" name="record" tooltip='<%=L"扮演录制/暂停(R)\nshift+左键:清空所有录制的动作"%>' style="margin-left: 0px; width: 32px; height: 32px; background: url(Texture/Aries/Creator/player/auto_off.png)" onclick="MovieClipController.OnRecord()"/>
-        <input type="button" name="settings" tooltip='<%=L"设置或修改当前角色"%>' style="margin-left: 0px; width: 32px; height: 32px; background: url(Texture/Aries/Creator/player/set_off.png)" onclick="MovieClipController.OnSettings()"/>
-    </div>
-    </pe:if>
-    <div style="padding-bottom:8px;">
-        <!--<input type="button" name="pause" tooltip='<%=L"暂停"%>' style="margin-left: 0px; width: 32px; height: 32px; background: url(Texture/Aries/Creator/player/suspend_off.png); " onclick="MovieClipController.OnPause()"/>-->
-        <input type="button" name="to_begin" tooltip='<%=L"到开始"%>' style="margin-left: 0px; width: 32px; height: 32px; background: url(Texture/Aries/Creator/player/back_off.png);" onclick="MovieClipController.OnGotoBeginFrame()"/>
-        <input type="button" name="play" tooltip='<%=L"播放/暂停(P)"%>' style="margin-left: 0px; width: 32px; height: 32px; background: url(Texture/Aries/Creator/player/play_off.png); " onclick="MovieClipController.OnPlay()"/>
-        <pe:if condition='<%=MovieClipController.IsPlayingMode()%>'>
-            <input type="button" name="record" tooltip='<%=L"开始录制MPEG(R)"%>' style="margin-left: 0px; width: 32px; height: 32px; background: url(Texture/Aries/Creator/player/rec_off.png); " onclick="MovieClipController.OnCaptureVideo()"/>
+        
+        <input type="button" name="addkeyframe" tooltip='<%=L"左键:加入关键帧\n右键:锁定/解锁对象"%>' style="margin-left:15px;margin-top:15px;texpack:addr_by_id(movieedit_PC->44.png);" onclick="MovieClipController.OnClickAddKeyFrameButton()"/>
+        <pe:if condition='<%=not MovieClipController.isMovieRecording()%>'>
+        <input type="button" name="record" tooltip='<%=L"左键:录制/暂停\nshift+左键:清空所有录制的动作"%>' style="margin-left:15px;margin-top:15px;texpack:addr_by_id(movieedit_PC->45.png);" onclick="MovieClipController.OnRecord()"/>
         </pe:if>
-        <input type="button" name="to_end" tooltip='<%=L"到结束"%>' style="margin-left: 0px; width: 32px; height: 32px; background: url(Texture/Aries/Creator/player/go_off.png); " onclick="MovieClipController.OnGotoEndFrame()"/>
-        <!--current time display-->
-        <input type="button" name="text" enabled="false" style="margin-left:10px;margin-top:6px;width:70px;background:;font-size:14px;color:#00ff00;font-weight:bold;text-align:left;"/>
-    </div>
-</aries:window>
+        <!-- recording -->
+        <pe:if condition='<%=MovieClipController.isMovieRecording()%>'>
+        <img style="margin-left:15px;margin-top:7px;texpack:addr_by_id(movieedit_PC->03.png);"/>
+        <input type="button" name="record" tooltip='<%=L"左键:录制/暂停\nshift+左键:清空所有录制的动作"%>' style="margin-left:-55px;margin-top:15px;texpack:addr_by_id(movieedit_PC->45.png);" onclick="MovieClipController.OnRecord()"/>
+        </pe:if>
+
+        <input type="button" name="settings" tooltip='<%=L"设置或修改当前对象"%>' style="margin-left:15px;margin-top:13px;texpack:addr_by_id(movieedit_PC->46.png);" onclick="MovieClipController.OnSettings()"/>
+        
+
+        <div style="margin-top:20px;">
+            <input type="button" name="to_begin" tooltip='<%=TL"到开始"%>' style="margin-left:36px;texpack:addr_by_id(movieedit_PC->04.png);" onclick="MovieClipController.OnGotoBeginFrame()"/>
+            <pe:if condition='<%=not MovieClipController.isMoviePlaying()%>'>
+            <input type="button" name="play" tooltip='<%=TL"播放"%>' style="margin-left:25px;texpack:addr_by_id(movieedit_PC->06.png);" onclick="MovieClipController.OnPlay()"/>
+            </pe:if>
+            <pe:if condition='<%=MovieClipController.isMoviePlaying()%>'>
+            <input type="button" name="play" tooltip='<%=TL"暂停"%>' style="margin-left:25px;texpack:addr_by_id(movieedit_PC->48.png);" onclick="MovieClipController.OnPlay()"/>
+            </pe:if>
+            <input type="button" name="to_last" tooltip='<%=TL"到最后"%>' style="margin-left:25px;texpack:addr_by_id(movieedit_PC->05.png);" onclick="MovieClipController.OnGotoEndFrame()"/>
+
+        </div>
+
+        <input type="button" name="text" enabled="false" style="margin-left:240px;margin-top:-30px;width:70px;background:;font-size:32px;color:#99ff99;font-weight:bold;"/>
+        
+    </pe:container>
+</pe:if>
+    
+    
+<pe:if condition='<%=MovieClipController.IsPlayingMode()%>'>
+    <pe:container alignment="_rb" style="margin-left:;margin-top:;texpack:addr_by_id(movieedit_PC->47.png);">
+        <input type="button" name="close" style="margin-left:315px;margin-top:16px;texpack:addr_by_id(movieedit_PC->22.png);" onclick="MovieClipController.OnClose()" />
+       
+        <div style="margin-top:40px;">
+            <input type="button" name="to_begin" tooltip='<%=TL"到开始"%>' style="margin-left:36px;texpack:addr_by_id(movieedit_PC->04.png);" onclick="MovieClipController.OnGotoBeginFrame()"/>
+            <pe:if condition='<%=not MovieClipController.isMoviePlaying()%>'>
+            <input type="button" name="play" tooltip='<%=TL"播放"%>' style="margin-left:25px;texpack:addr_by_id(movieedit_PC->06.png);" onclick="MovieClipController.OnPlay()"/>
+            </pe:if>
+            <pe:if condition='<%=MovieClipController.isMoviePlaying()%>'>
+            <input type="button" name="pause" tooltip='<%=TL"暂停"%>' style="margin-left:25px;texpack:addr_by_id(movieedit_PC->48.png);" onclick="MovieClipController.OnPlay()"/>
+            </pe:if>
+            <input type="button" name="to_last" tooltip='<%=TL"到最后"%>' style="margin-left:25px;texpack:addr_by_id(movieedit_PC->05.png);" onclick="MovieClipController.OnGotoEndFrame()"/>
+
+        </div>
+        
+        <input type="button" name="text" enabled="false" style="margin-left:20px;margin-top:0px;width:70px;background:;font-size:32px;color:#99ff99;font-weight:bold;"/>
+        
+    </pe:container>
+</pe:if>
+
+
 </pe:mcml>
 </body>
 </html>

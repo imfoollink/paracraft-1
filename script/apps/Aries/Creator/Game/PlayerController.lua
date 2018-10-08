@@ -304,7 +304,7 @@ function PlayerController:DropItemTo3DScene(inventory, slot_id, count, x, y, z)
 			-- send a packet to server
 			local clientMP = EntityManager.GetPlayer();
 			if(clientMP and clientMP.AddToSendQueue) then
-				clientMP:AddToSendQueue(Packets.PacketEntityFunction:new():Init(clientMP, "dropitem", {x=x, y=y,z=z, id = itemStack.id, count = itemStack.count, serverdata=itemStack.serverdata}));
+				clientMP:AddToSendQueue(Packets.PacketEntityFunction:new():Init(clientMP, "dropitem", {x=x, y=y,z=z, id = itemStack.id, count = itemStack.count, serverdata=itemStack.serverdata, slot = slot_id}));
 			end
 		end
 	else

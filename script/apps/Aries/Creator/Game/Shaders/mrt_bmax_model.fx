@@ -1,6 +1,7 @@
 // Author: LiXizhi@yeah.net
 // Date: 2015/5/22
 // Desc: block max model shader.
+#include "CommonFunction.fx"
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Per frame parameters
@@ -35,7 +36,7 @@ VSOut MainVS(float4 pos		: POSITION,
 	float3 worldNormal = normalize(mul(Norm, (float3x3)mWorld));
 	output.normal = worldNormal*0.5 + 0.5;
 
-	output.color.xyz = color.rgb * colorDiffuse;
+	output.color.xyz = color.rgb;
 
 	// calculate the fog factor
 	output.color.w = cameraPos.z;
@@ -57,6 +58,7 @@ BlockPSOut MainPS(VSOut input)
 {
 	BlockPSOut output;
 	output.Color = float4(input.color.rgb, g_opacity);
+  output.Color.rgb=gammaCorrectRead(output.Color.rgb);
 	output.BlockInfo = float4(1, BlockLightStrength.x, BlockLightStrength.y, 1);
 	output.Depth = float4(input.color.w, 0, 0, 1);
 	output.Normal = float4(input.normal.xyz, 1);

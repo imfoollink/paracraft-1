@@ -44,7 +44,7 @@ function NetClientHandler:Init(ip, port, username, password, worldClient, tunnel
 	if(tunnelClient) then
 		-- TODO: this should be the username of the private host server. 
 		-- here we just use "_admin" for the first user in the room. 
-		nid = "_admin";
+		nid = tunnelClient:getHostName();
 	else
 		nid = self:CheckGetNidFromIPAddress(ip, port);
 	end
@@ -100,22 +100,22 @@ function NetClientHandler:handleErrorMessage(text)
 		_guihelper.MessageBox(L"无法链接到这个服务器,可能该服务器未开启或已关闭.详情请联系该服务器管理员.");
 	else --if(text == "OnConnectionLost") then
 		if(GameLogic.GetWorld() == self.worldClient) then
-			BroadcastHelper.PushLabel({id="NetClientHandler", label = L"与服务器的连接断开了", max_duration=6000, color = "255 0 0", scaling=1.1, bold=true, shadow=true,});
+			--BroadcastHelper.PushLabel({id="NetClientHandler", label = L"与服务器的连接断开了", max_duration=6000, color = "255 0 0", scaling=1.1, bold=true, shadow=true,});
 			NetworkMain.isClient = false;
-			NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/ServerPage.lua");
-			local ServerPage = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.ServerPage");
-			ServerPage.ResetClientInfo()
-			_guihelper.MessageBox(L"已与服务器断开连接,可能服务器已关闭或有其他用户使用该帐号登录.点击\"确定\"返回本地世界",function (result)
-				NPL.load("(gl)script/apps/Aries/Creator/Game/Login/InternetLoadWorld.lua");
-				local InternetLoadWorld = commonlib.gettable("MyCompany.Aries.Creator.Game.Login.InternetLoadWorld");
-				InternetLoadWorld.EnterWorld()
-				--if(result == _guihelper.DialogResult.Yes) then
-				--end
-			end,_guihelper.MessageBoxButtons.OK);
-			--local player = self.worldClient:GetPlayer();
-			--if(player) then
-				--player:UpdateDisplayName("oops! ConnectionLost!");
-			--end
+			--NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/ServerPage.lua");
+			--local ServerPage = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.ServerPage");
+			--ServerPage.ResetClientInfo()
+			--_guihelper.MessageBox(L"已与服务器断开连接,可能服务器已关闭或有其他用户使用该帐号登录.点击\"确定\"返回本地世界",function (result)
+				--NPL.load("(gl)script/apps/Aries/Creator/Game/Login/InternetLoadWorld_truck.lua");
+				--local InternetLoadWorld_truck = commonlib.gettable("MyCompany.Aries.Creator.Game.Login.InternetLoadWorld_truck");
+				--InternetLoadWorld_truck.EnterWorld()
+				----if(result == _guihelper.DialogResult.Yes) then
+				----end
+			--end,_guihelper.MessageBoxButtons.OK);
+			----local player = self.worldClient:GetPlayer();
+			----if(player) then
+				----player:UpdateDisplayName("oops! ConnectionLost!");
+			----end
 		end
 	end
 	self:Cleanup();
@@ -145,14 +145,14 @@ function NetClientHandler:handleAuthUser(packet_AuthUser)
 			-- spawn in a new world
 			MyCompany.Aries.Game.StartEmptyClientWorld(self.worldClient, function()
 				-- empty world is prepared, so request to login. 
-				self:AddToSendQueue(Packets.PacketLoginClient:new():Init());
+				self:AddToSendQueue(Packets.PacketLoginClient:new():Init(self.last_username, self.last_password));
 			end);
 		else
 			-- replace current world: only used in debugging
 			if(not GameLogic.GetWorld() or (not GameLogic.GetWorld():isa(MyCompany.Aries.Game.World.WorldClient) and not GameLogic.GetWorld():isa(MyCompany.Aries.Game.World.WorldServer))) then
 				GameLogic.ReplaceWorld(self.worldClient);
 			end
-			self:AddToSendQueue(Packets.PacketLoginClient:new():Init());
+			self:AddToSendQueue(Packets.PacketLoginClient:new():Init(self.last_username, self.last_password));
 		end
 	elseif(packet_AuthUser.result == "failed") then
 		if(not self.last_password or self.last_password=="") then
@@ -201,6 +201,11 @@ end
 function NetClientHandler:handleLogin(packet_login)
 	local entityPlayer = self.worldClient:CreateClientPlayer(packet_login.clientEntityId, self);
 	self.currentServerMaxPlayers = packet_login.maxPlayers;
+
+	if entityPlayer  then
+		GameLogic.GetFilters():apply_filters("client_side_player_self_created", entityPlayer);
+	end
+
 	packet_login = GameLogic.GetFilters():apply_filters("handleLogin", packet_login);
 	entityPlayer:AutoFindPosition(true);
 end
@@ -338,6 +343,12 @@ function NetClientHandler:handleEntityPlayerSpawn(packet_EntityPlayerSpawn)
 	end
 
 	clientMP:Attach();
+
+	clientMP.asset_id = packet_EntityPlayerSpawn.asset_id;
+	clientMP.nickname = packet_EntityPlayerSpawn.nick_name;
+	clientMP.ishost = packet_EntityPlayerSpawn.is_host;
+	GameLogic.GetFilters():apply_filters("client_side_player_other_created", clientMP);
+	-- TODO: watched data? such as animation, action, etc. 
 end
 
 
@@ -515,6 +526,14 @@ function NetClientHandler:handleMobSpawn(packet_MobSpawn)
 	elseif(entity_type == 13) then
 		spawnedEntity = EntityManager.EntityItem:new():Init(x,y,z, ItemStack:new():Init(packet_MobSpawn.item_id,1));
 		LOG.std(nil, "debug", "client::handleMobSpawn", "item: %d", packet_MobSpawn.item_id or -1);
+	elseif(entity_type == 14) then 
+		NPL.load("script/Truck/Game/Entity/EntityNPCOnline.lua")
+		local EntityNPCOnline = commonlib.gettable("Mod.Truck.Game.EntityNPCOnline")
+		spawnedEntity = EntityNPCOnline:new():Create({x=x,y=y,z=z, item_id = packet_MobSpawn.item_id or block_types.names["villager"]});
+	elseif(entity_type == 15) then 
+		NPL.load("(gl)script/Truck/Game/Entity/EntityHomePointOnline.lua");
+		local EntityHomePointOnline = commonlib.gettable("MyCompany.Aries.Game.EntityManager.EntityHomePointOnline")
+		spawnedEntity = EntityHomePointOnline:new():Create({x = x, y = y, z = z, item_id = block_types.names["player_spawn_point"], name = "player_spawn_point"})
 	else
 		-- TODO: add other types
 	end
@@ -617,4 +636,65 @@ function NetClientHandler:handleClientCommand(packet_ClientCommand)
 			CommandManager:RunFromConsole(cmd, self.playerEntity);
 		end
 	end
+end
+
+
+function NetClientHandler:handleSetScript(packet)
+	NPL.load("(gl)script/Truck/Independent/Independent.lua");
+	local Independent = commonlib.gettable("Mod.Truck.Independent");
+	
+	local ResourceManager = NPL.load("script/Truck/Game/Resource/ResourceManager.lua")
+	local Resource = NPL.load("script/Truck/Game/Resource/Resource.lua")
+	local TaskExecutor = NPL.load("(gl)script/Truck/Utility/TaskExecutor.lua");
+	local files = {};
+	local tasks = TaskExecutor:new();
+	local SavedData = NPL.load("script/Truck/Game/Resource/SavedData.lua")
+
+	local download;
+	download = function(pid, ext, index, sum)
+		tasks:addTask(function (t)
+
+			BroadcastHelper.PushLabel({id="download script", label = string.format("下载脚本模块中 %s/%s", index - 1, sum),max_duration = 10000, color =  "255 255 255", scaling=1, bold=true, shadow=true,});
+
+			ResourceManager.downloadFileByPhysicalId(pid, function (path, err)
+				if err then 
+					_guihelper.MessageBox("脚本模块下载失败");
+					tasks:clear();
+					return ;
+				end
+				ext = ext or "lua";
+				if ext == "pkg" then 
+					local list = commonlib.LoadTableFromFile(path);
+					for k,v in ipairs(list or {}) do
+						download(v.pid, v.ext, k, #list);
+					end
+					t:done();
+				else
+					NPL.load("(gl)script/Truck/Utility/qiniuHash.lua");
+					local QiniuHash = commonlib.gettable("Mod.Truck.Utility.QiniuHash");
+					local hash = QiniuHash.hashFile(path);
+					local newpath = "temp/script/" .. hash ..".".. tostring(ext or "");
+					ParaIO.CopyFile(path, newpath, true)
+					files[#files + 1] = newpath;
+					t:done();
+				end
+			end, nil, 4)
+		end)
+	end
+
+
+	for k,v in ipairs(packet.scripts or {}) do
+		download(v.pid, v.ext,k , #packet.scripts);
+	end
+	
+	
+	tasks:execute(function ()
+        BroadcastHelper.PushLabel({id="download script", label = TL"模块下载完成", max_duration = 2000, color =  "255 255 255", scaling=1, bold=true, shadow=true,});
+
+		SavedData.load(function ()
+			Independent.stop();
+			Independent.prepare(files);
+			Independent.start();
+		end)
+	end)
 end

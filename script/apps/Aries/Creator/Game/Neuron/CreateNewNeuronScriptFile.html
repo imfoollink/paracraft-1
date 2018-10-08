@@ -145,10 +145,10 @@ end
     <file name="t:example" text="homepoint event" tooltip="script/apps/Aries/Creator/Game/Neuron/Templates/homepoint_event.lua"></file>
     <file name="t:example" text="basics example" tooltip="script/apps/Aries/Creator/Game/Neuron/Templates/example.lua"></file>
 </Resource>
-<aries:window mode="thin" class="default" title='<%=L"创建与物品关联的脚本文件"%>' style="width:700px;" onclose="ClosePage">
-    <div style="margin-right:3px;">
+<!-- <aries:window mode="thin" class="default" title='<%=L"创建与物品关联的脚本嗷嗷嗷文件"%>' style="width:700px;" onclose="ClosePage"> -->
+    <div style="margin-right:3px;margin-top:-10px;">
     <div style="height:330px;">
-        <div style="float:left;padding-top:5px;" class="mc_paper_panel" width="30%">
+        <pe:container style="float:left;padding-top:5px;" class="mc_paper_panel" width="30%">
             <pe:treeview  class="defaulttreeview" name="templateDir" style="font-size:12px;" DataSourceID='MyCategoryDS' DefaultNodeHeight="22">
 	            <NodeTemplates>
 		            <NodeTemplate DataType="folder">
@@ -160,7 +160,7 @@ end
 	            </NodeTemplates>
                 <DataNodePlaceholder xpath="*"/>
             </pe:treeview>
-        </div>
+        </pe:container>
         <div style="float:left;" width="70%">
             <div style="height:25px;margin-left:10px;">
                 <%=L"请选择一个模板文件或已经存在的文件:"%>
@@ -186,20 +186,21 @@ end
                 <div style="float:left;padding:5px;padding-top:3px;height:305px;" width="60%" class="mc_paper_panel" >
                     <div style="height:20px;margin-left:8px;"><%=L"文件预览:"%></div>
                     <hr />
-                    <textarea name="filecontent" rows="13" UseSystemControl="true" syntax_map="NPL">
+                    <textarea name="filecontent" rows="13" syntax_map="NPL">
                     </textarea>
                 </div>
             </div>
         </div>
     </div>
     </div>    
-    <div style="margin-left:80px;margin-bottom:5px;">
+    <div style="margin-left:80px;margin-bottom:5px;margin-top:-15px;">
         <%=L"文件名:"%>
         <input name="filename" class="mc_text" value="test" style="width:400px;height:22px;" />
         <input type="button" name="btnOK" value='<%=L"确定"%>' onclick="OnClickOK" style="margin-left:5px;min-width:60px;margin-top:0px;" class="button"/>
         <input type="button" name="btnCancel" value='<%=L"取消"%>' onclick="ClosePage" style="margin-left:5px;min-width:60px;margin-top:0px;" class="button"/>
+        <input type="button" name="close" style="margin-left:560px;margin-top:-310px;texpack:addr_by_id(movieedit_PC->22.png);" onclick="ClosePage()" />
     </div>
-</aries:window>            
+<!-- </aries:window>             -->
 </pe:mcml> 
 </body>
 </html>

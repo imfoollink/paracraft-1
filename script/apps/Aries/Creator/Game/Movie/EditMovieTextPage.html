@@ -60,9 +60,14 @@ function OnClearText()
     Page:SetValue("text", "");
 end
 ]]></script>
-<aries:window mode="thin" style="width:640px;" title='<%=EditMovieTextPage.GetTitle()%>' onclose="EditMovieTextPage.OnClose">
-<div style="margin: 10px; margin-bottom: 15px; color: #ffffff;">
-    <div style="margin-top: 5px;">
+<!-- <aries:window mode="thin" style="width:640px;" title='<%=EditMovieTextPage.GetTitle()%>' onclose="EditMovieTextPage.OnClose"> -->
+
+<pe:container alignment="_ct" style="margin-left:-240px;margin-top:-138px;texpack:addr_by_id(movieedit_PC->19.png);">
+
+<input type="button" name="close" style="margin-left:420px;margin-top:13px;texpack:addr_by_id(movieedit_PC->22.png);" onclick="EditMovieTextPage.OnClose()" />
+
+<div style="color: #ffffff;margin-top:20px;">
+    <div style="margin-top: 5px;margin-left:10px;">
         <div style="float:left;">
             <%=L"字号:"%>
             <select name="fontsize" AllowUserEdit="false" style="height:24px;" DataSource='<%=GetFontSizeDS()%>'>
@@ -79,7 +84,7 @@ end
             </select>
         </div>
     </div>
-    <div style="margin-top: 5px;">
+    <div style="margin-top: 5px;margin-left:10px;">
         <div style="float:left;">
             <%=L"背景:"%>
             <select name="bgcolor" AllowUserEdit="false" style="height:24px;"  DataSource='<%=GetBGColorDS()%>'>
@@ -96,19 +101,25 @@ end
             </select>
         </div>
     </div>
-    <div style="margin-top: 10px; ">
+    <div style="margin-top: 10px;margin-left:10px;">
         <div style="float:left;"><%=L"文字:"%></div>
         <div class="mc_paper_panel" style="float: left; margin-left:0px; padding:5px;margin-right:5px;">
-            <input type="text" autofocus="true" name="text" EmptyText='<%=L"在这里输入字幕"%>' rows="3" UseSystemControl="true" CaretColor="#FFFFFFFF" style="background:;" />
+            <input type="text" autofocus="true" name="text" EmptyText='<%=L"在这里输入字幕"%>' rows="3" CaretColor="#FFFFFFFF" style="background:;" />
         </div>
     </div>
-    <div style="margin-top:10px;">
+    <div style="margin-top:10px;margin-left:10px;">
         <input type="button" name="Reset" style="margin-left:40px;min-width:70px;" class="mc_light_grey_button_with_fillet" onclick="EditMovieTextPage.OnReset" tooltip='<%=L"使用默认值"%>' value='<%=L"重置"%>' />
         <input type="button" name="ClearText" style="margin-left:10px;min-width:70px;" class="mc_light_grey_button_with_fillet" onclick="OnClearText" value='<%=L"清除文字"%>' />
         <input type="button" name="OK" DefaultButton="true" align="right" style="margin-right:20px;min-width:70px;" class="mc_light_grey_button_with_fillet" onclick="EditMovieTextPage.OnOK" value='<%=L"确定"%>' />
     </div>
 </div>
-</aries:window>
+
+
+
+</pe:container>
+
+<!-- </aries:window> -->
+
 </pe:mcml>
 </body>
 </html>

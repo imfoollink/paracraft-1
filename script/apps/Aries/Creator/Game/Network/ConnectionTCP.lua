@@ -53,9 +53,8 @@ end
 
 function ConnectionTCP:Connect(timeout, callback_func)
 	if(self.tunnelClient) then
-		if(callback_func) then
-			self.tunnelClient:LoginTunnel(callback_func);
-		end
+		self.tunnelClient:ConnectHost(callback_func);
+		callback_func(true)
 	else
 		return ConnectionTCP._super.Connect(self, timeout, callback_func);
 	end
@@ -63,8 +62,13 @@ end
 
 function ConnectionTCP:Send(msg, neuronfile)
 	if(self.tunnelClient) then
-		return self.tunnelClient:Send(self:GetNid(), msg, neuronfile);
+		if (not self.connectionClosed) then
+			return self.tunnelClient:Send(self:GetNid(), msg, neuronfile);
+		else
+			return false;
+		end
 	else
 		return ConnectionTCP._super.Send(self, msg, neuronfile);
 	end
 end
+

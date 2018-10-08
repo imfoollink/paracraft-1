@@ -14,6 +14,10 @@ MovieClipController.SetFocusToItemStack(itemStack);
 NPL.load("(gl)script/ide/DateTime.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/MovieManager.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/MovieUISound.lua");
+NPL.load("(gl)script/Truck/Game/ModuleManager.lua");
+NPL.load("(gl)script/Truck/Game/UI/UIManager.lua");
+local UIManager= commonlib.gettable("Mod.Truck.Game.UI.UIManager");
+local ModuleManager = commonlib.gettable("Mod.Truck.Game.ModuleManager");
 local MovieUISound = commonlib.gettable("MyCompany.Aries.Game.Movie.MovieUISound");
 local MovieManager = commonlib.gettable("MyCompany.Aries.Game.Movie.MovieManager");
 local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
@@ -40,6 +44,8 @@ function MovieClipController.OnInit()
 	self.mytimer = self.mytimer or commonlib.Timer:new({callbackFunc = self.OnTimer})
 	self.mytimer:Change(200, 200);
 	Game.SelectionManager:Connect("selectedActorChanged", self, self.OnSelectedActorChange, "UniqueConnection");
+
+	ModuleManager.startModule("HideUI",{mUIMain=UIManager.getUI("UIMain")},true);
 end
 
 function MovieClipController.OnClosePage()
@@ -47,6 +53,8 @@ function MovieClipController.OnClosePage()
 	-- focus back to current player. 
 	self.RestoreFocusToCurrentPlayer();
 	Game.SelectionManager:Disconnect("selectedActorChanged", self, self.OnSelectedActorChange);
+
+	ModuleManager.stopModule("HideUI");
 end
 
 function MovieClipController:OnSelectedActorChange(actor)
@@ -145,7 +153,7 @@ function MovieClipController.ShowPage(bShow, OnClose)
 	end
 
 	if(not page) then
-		local width,height = 200, 235;
+		local width,height = 378, 494;
 		local params = {
 				url = "script/apps/Aries/Creator/Game/Movie/MovieClipController.html", 
 				name = "MovieClipController.ShowPage", 
@@ -163,7 +171,7 @@ function MovieClipController.ShowPage(bShow, OnClose)
 					align = "_rb",
 					x = -width-20,
 					y = -height - MovieClipController.GetMarginBottom(),
-					width = 200,
+					width = width,
 					height = height,
 			};
 		System.App.Commands.Call("File.MCMLWindowFrame", params);
@@ -278,11 +286,14 @@ function MovieClipController.OnClickAddNPC()
 				if(entity and entity:isa(EntityManager.EntityMob)) then
 					
 					entity:SetDisplayName(movieClip:NewActorName());
-					NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/MobPropertyPage.lua");
+					--[[NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/MobPropertyPage.lua");
 					local MobPropertyPage = commonlib.gettable("MyCompany.Aries.Game.GUI.MobPropertyPage");
 					MobPropertyPage.ShowPage(entity, nil, function()
 						actor:SaveStaticAppearance();
-					end);
+					end);]]
+					NPL.load("(gl)script/Truck/Game/UI/UIManager.lua");
+					local UIManager= commonlib.gettable("Mod.Truck.Game.UI.UIManager");
+					UIManager.createUI("NPCeditor",UIManager.getUI("UIMain"),nil,{mEntity=entity,mActor=actor});
 				end
 			end
 		end
@@ -458,6 +469,7 @@ function MovieClipController.OnRecord()
 					actor:SetRecording(false);
 					actor:Pause();
 				end
+				page:Refresh(0.1);
 			end
 		end
     end
@@ -495,7 +507,8 @@ function MovieClipController.OnPlay()
             movieClip:Resume();
 		else
 			movieClip:Pause();
-        end
+		end
+		page:Refresh(0.1); 
 	end
 end
 
@@ -573,13 +586,36 @@ function MovieClipController.OnSettings()
 		local focus = movieClip:GetFocus();
 		if(focus) then
 			-- select me to edit. 
-			focus:SelectMe();
+			--focus:SelectMe();
+			if focus:GetEntity() and MovieClipController.GetMovieActor() then
+				NPL.load("(gl)script/Truck/Game/UI/UIManager.lua");
+				local UIManager= commonlib.gettable("Mod.Truck.Game.UI.UIManager");
+				UIManager.createUI("NPCeditor",UIManager.getUI("UIMain"),nil,{mEntity=focus:GetEntity(),mActor=MovieClipController.GetMovieActor()});
+			end
 		else
 			local entity = movieClip:GetEntity();
-			if(entity and entity.OpenBagEditor) then
+			--[[if(entity and entity.OpenBagEditor) then
 				entity:OpenBagEditor();
+			end]]
+			if entity and MovieClipController.GetMovieActor() then
+				NPL.load("(gl)script/Truck/Game/UI/UIManager.lua");
+				local UIManager= commonlib.gettable("Mod.Truck.Game.UI.UIManager");
+				UIManager.createUI("NPCeditor",UIManager.getUI("UIMain"),nil,{mEntity=entity,mActor=MovieClipController.GetMovieActor()});
 			end
 		end
 	end
 end
 
+function MovieClipController.isMoviePlaying()
+	local movieClip = MovieClipController.GetMovieClip();
+	if(movieClip) then
+		return not movieClip:IsPaused();
+	end
+end
+
+function MovieClipController.isMovieRecording()
+	local actor = MovieClipController.GetMovieActor();
+	if actor then
+		return actor:IsRecording();
+	end
+end

@@ -77,7 +77,7 @@ function RuleBlock:SetCanPlace(from_block, to_block)
 end
 
 function RuleBlock:SetCanDestroy(from_block, canDestroy)
-	self.type = "CanPlace";
+	self.type = "CanDestroy";
 	self.from_block = block_types.GetByNameOrID(from_block);
 	self.canDestroy = canDestroy;
 	if(self.from_block) then

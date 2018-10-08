@@ -9,15 +9,18 @@ when a group of blocks are selected, the following commands can be applied.
    * shift+left click a place to translate the current selection to a new position. (multiple clicks will create multiple copies)
 use the lib:
 ------------------------------------------------------------
-NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/SelectBlocksTask.lua");
-local SelectBlocks = commonlib.gettable("MyCompany.Aries.Game.Tasks.SelectBlocks");
-local task = MyCompany.Aries.Game.Tasks.SelectBlocks:new({blockX = result.blockX,blockY = result.blockY, blockZ = result.blockZ, blocks=nil})
+NPL.load("(gl)script/Truck/SelectBlocksTask.lua");
+local SelectBlocks = commonlib.gettable("Mod.Truck.UI.SelectBlocks");
+local task = Mod.Truck.UI.SelectBlocks:new({blockX = result.blockX,blockY = result.blockY, blockZ = result.blockZ, blocks=nil})
 task:Run();
 -------------------------------------------------------
 ]]
 NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/UndoManager.lua");
 NPL.load("(gl)script/ide/math/vector.lua");
 NPL.load("(gl)script/ide/math/ShapeAABB.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/SceneContext/RedirectContext.lua");
+NPL.load("(gl)script/ide/AudioEngine/AudioEngine.lua");
+local AudioEngine = commonlib.gettable("AudioEngine");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/TransformWnd.lua");
 local TransformWnd = commonlib.gettable("MyCompany.Aries.Game.Tasks.TransformWnd");
 local Direction = commonlib.gettable("MyCompany.Aries.Game.Common.Direction")
@@ -45,6 +48,7 @@ SelectBlocks:Signal("valueChanged");
 
 local groupindex_hint = 6; 
 
+local tempBlocks;
 -- this is always a top level task. 
 SelectBlocks.is_top_level = true;
 -- picking filter
@@ -364,6 +368,10 @@ function SelectBlocks:ReplaceSelection(blocks)
 	ParaTerrain.DeselectAllBlock();
 	self.blocks = blocks;
 	cur_selection = blocks;
+	for i=1, #blocks do
+		local b = blocks[i];
+		ParaTerrain.SelectBlock(b[1],b[2],b[3],true);
+	end
 end
 
 
@@ -678,7 +686,11 @@ function SelectBlocks:handleLeftClickScene(event)
 		end	
 	else
 		-- clicking without ctrl key will cancel the selection mode. 
-		SelectBlocks.CancelSelection();
+		local x = event.x;
+		local y = event.y;
+		if(x < 0 or x > 230 or y < 160 or y > (160 + 332)) then
+			SelectBlocks.CancelSelection();
+		end
 	end
 end
 
@@ -706,6 +718,9 @@ function SelectBlocks:keyPressEvent(event)
 		SelectBlocks.TransformSelection({rot_angle=1.57, rot_axis = "y"})
 	elseif(dik_key == "DIK_RBRACKET")then
 		SelectBlocks.TransformSelection({rot_angle=-1.57, rot_axis = "y"})
+	elseif(dik_key == "DIK_RETURN")then
+		NPL.load("(gl)script/Truck/ChatWindow.lua");
+		MyCompany.Aries.ChatSystem.ChatWindow.ShowPage();
 	elseif(dik_key == "DIK_A" and event.ctrl_pressed)then
 		SelectBlocks.SelectAll(true)
 	elseif(dik_key == "DIK_C" or dik_key == "DIK_V" or dik_key == "DIK_X" )then
@@ -720,9 +735,9 @@ function SelectBlocks:keyPressEvent(event)
 		end
 	elseif(dik_key == "DIK_Z")then
 		if(event.ctrl_pressed) then
-			self:PopAABB();
-		elseif(dik_key == "DIK_Z") then
 			UndoManager.Undo();
+		elseif(dik_key == "DIK_Z") then
+			self:PopAABB();
 		end
 	elseif(dik_key == "DIK_Y")then
 		UndoManager.Redo();
@@ -743,13 +758,14 @@ local page;
 function SelectBlocks.ShowPage(bShow)
 	SelectBlocks.selected_count = 0;
 	-- display a page containing all operations that can apply to current selection, like deletion, extruding, coloring, etc. 
-	local x, y, width, height = 0, 160, 120, 330;
+	local x, y, width, height = 0, 160, 230, 332;
 	System.App.Commands.Call("File.MCMLWindowFrame", {
 			url = "script/apps/Aries/Creator/Game/Tasks/SelectBlocksTask.html", 
 			name = "SelectBlocksTask.ShowPage", 
 			app_key = MyCompany.Aries.Creator.Game.Desktop.App.app_key, 
 			isShowTitleBar = false,
 			DestroyOnClose = true, -- prevent many ViewProfile pages staying in memory
+			enable_esc_key = true,
 			style = CommonCtrl.WindowFrame.ContainerStyle,
 			zorder = 1,
 			allowDrag = true,
@@ -811,11 +827,10 @@ function SelectBlocks.OnInit()
 	page = document:GetPageCtrl();
 	if(System.options.mc) then
 		page.OnClose = function () 
-			TransformWnd.ClosePage();
-			
-			NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/MirrorWnd.lua");
-			local MirrorWnd = commonlib.gettable("MyCompany.Aries.Game.GUI.MirrorWnd");
-			MirrorWnd.ClosePage();
+			NPL.load("(gl)script/Truck/SelectBlocksScale.lua");
+			local SelectBlocksScale = commonlib.gettable("Mod.Truck.UI.SelectBlocksScale");
+			SelectBlocksScale.ClosePage();
+
 		end	
 	end
 end
@@ -826,6 +841,7 @@ function SelectBlocks.GetEventSystem()
 end
 
 function SelectBlocks.DoClick(name)
+	AudioEngine.PlayUISound("btn_show");
 	local self = SelectBlocks;
 	if(name == "delete")then
 		self.DeleteSelection()
@@ -839,8 +855,16 @@ function SelectBlocks.DoClick(name)
 	elseif(name == "extrude_posY")then
 		-- can we scale like vectors so that we can resize a hollow room without making the wall thicke?
 		self.AutoExtrude(true);
-	elseif(name == "btnTransform" or name == "btn_transform")then
-		SelectBlocks.ShowTransformWnd();
+	elseif(name == "btn_transform" or name == "btn_mirror" or name == "btn_rotate")then
+		--SelectBlocks.ShowTransformWnd();
+		if(name == "btn_transform") then
+			pagetype = "scale";
+		elseif(name == "btn_mirror") then
+			pagetype = "mirror";	
+		elseif(name == "btn_rotate") then
+			pagetype = "rotate";
+		end
+		SelectBlocks.ShowScalePage(pagetype);
 	elseif(name == "left_rot" or name == "btn_rotate_left")then
 		SelectBlocks.TransformSelection({rot_angle=1.57, rot_axis = "y"})
 	elseif(name == "right_rot" or name == "btn_rotate_right")then
@@ -1098,6 +1122,8 @@ function SelectBlocks:PasteBlocks(bx, by, bz)
 				bx, by, bz = BlockEngine:GetBlockIndexBySide(result.blockX, result.blockY, result.blockZ, result.side)
 				copy_task.x, copy_task.y, copy_task.z = bx, by, bz;
 			end
+		elseif(bx and by and bz) then
+			copy_task.x, copy_task.y, copy_task.z = bx, by, bz;
 		end
 
 		if(copy_task.x) then
@@ -1108,17 +1134,39 @@ function SelectBlocks:PasteBlocks(bx, by, bz)
 				
 				NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/TransformBlocksTask.lua");
 				local dx,dy,dz = MyCompany.Aries.Game.Tasks.TransformBlocks:GetDeltaPosition(copy_task.x,copy_task.y,copy_task.z, copy_task.aabb);
-				
-				TransformWnd.ShowPage(copy_task.blocks, {x=dx, y=dy, z=dz, method=copy_task.operation}, function(trans, res)
+
+				NPL.load("(gl)script/Truck/SelectBlocksScale.lua");
+				local SelectBlocksScale = commonlib.gettable("Mod.Truck.UI.SelectBlocksScale");
+				SelectBlocksScale.pagetype = "paste";
+				SelectBlocksScale.ShowPage(copy_task.blocks, {x=dx, y=dy, z=dz, copy_task.operation}, function(trans,settings, res)
 					if(trans and res == "ok") then
 						copy_task.dx = trans.x;
 						copy_task.dy = trans.y;
 						copy_task.dz = trans.z;
 						copy_task.x,copy_task.y,copy_task.z = nil, nil, nil;
+						copy_task.rot_y = trans.facing*3.14/180;
 						copy_task = MyCompany.Aries.Game.Tasks.TransformBlocks:new(copy_task);
 						copy_task:Run();
 					end
 				end)
+
+
+				--NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/TransformWnd.lua");
+				--local TransformWnd = commonlib.gettable("MyCompany.Aries.Game.Tasks.TransformWnd");
+			--
+				--NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/TransformBlocksTask.lua");
+				--local dx,dy,dz = MyCompany.Aries.Game.Tasks.TransformBlocks:GetDeltaPosition(copy_task.x,copy_task.y,copy_task.z, copy_task.aabb);
+				--
+				--TransformWnd.ShowPage(copy_task.blocks, {x=dx, y=dy, z=dz, facing=0, method=copy_task.operation}, function(trans, res)
+					--if(trans and res == "ok") then
+						--copy_task.dx = trans.x;
+						--copy_task.dy = trans.y;
+						--copy_task.dz = trans.z;
+						--copy_task.x,copy_task.y,copy_task.z = nil, nil, nil;
+						--copy_task = MyCompany.Aries.Game.Tasks.TransformBlocks:new(copy_task);
+						--copy_task:Run();
+					--end
+				--end)
 			else
 				NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/TransformBlocksTask.lua");
 				copy_task = MyCompany.Aries.Game.Tasks.TransformBlocks:new(copy_task);
@@ -1131,58 +1179,12 @@ function SelectBlocks:PasteBlocks(bx, by, bz)
 	end
 end
 
-local function OnMirrorSelectionChanged()
-	local self = cur_instance;
-	if(self and cur_selection) then
-		local pivot_x,pivot_y,pivot_z = unpack(self:GetPivotPoint());
-		NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/MirrorWnd.lua");
-		local MirrorWnd = commonlib.gettable("MyCompany.Aries.Game.GUI.MirrorWnd");
-
-		MirrorWnd.UpdateHintLocation(cur_selection, pivot_x, pivot_y, pivot_z);
-	end
-end
-
-function SelectBlocks:SetMirrorMode(bEnable)
-	if(self.isMirrorMode ~= bEnable) then
-		self.isMirrorMode = bEnable;
-		if(self:GetSceneContext() and self:GetSceneContext():HasManipulators()) then
-			self:UpdateManipulators();
-		end
-	end
-end
-
-function SelectBlocks:IsMirrorMode()
-	return self.isMirrorMode;
-end
-
-function SelectBlocks.MirrorSelection()
-	local self = cur_instance;
-	if(self) then
-		local pivot_x,pivot_y,pivot_z = unpack(self:GetPivotPoint());
-		NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/MirrorWnd.lua");
-		local MirrorWnd = commonlib.gettable("MyCompany.Aries.Game.GUI.MirrorWnd");
-		
-		SelectBlocks.GetEventSystem():AddEventListener("OnSelectionChanged", OnMirrorSelectionChanged, nil, "MirrorWnd");
-
-		self:SetMirrorMode(true);
-
-		MirrorWnd.ShowPage(cur_selection, pivot_x,pivot_y,pivot_z, function(settings, result)
-			SelectBlocks.GetEventSystem():RemoveEventListener("OnSelectionChanged", OnMirrorSelectionChanged);
-			self:SetMirrorMode(false);
-			if(result) then
-				NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/MirrorBlocksTask.lua");
-				local task = MyCompany.Aries.Game.Tasks.MirrorBlocks:new({method=settings.method, from_blocks=MirrorWnd.blocks, pivot_x=MirrorWnd.pivot_x,pivot_y=MirrorWnd.pivot_y,pivot_z=MirrorWnd.pivot_z, mirror_axis=settings.xyz, })
-				task:Run();
-			end
-		end);
-
-		MirrorWnd:Connect("axisChanged", SelectBlocks, SelectBlocks.OnMirrorAxisChange, "UniqueConnection");
-	end
-end
 
 local function OnTransformSelectionChanged()
 	local self = cur_instance;
 	if(self and cur_selection) then
+		NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/TransformWnd.lua");
+		local TransformWnd = commonlib.gettable("MyCompany.Aries.Game.Tasks.TransformWnd");
 		TransformWnd.UpdateHintLocation(cur_selection);
 	end
 end
@@ -1191,35 +1193,97 @@ function SelectBlocks.ShowTransformWnd()
 	if(cur_instance and cur_instance.aabb and cur_instance.aabb:IsValid() and #cur_selection > 0) then
 		local self = cur_instance;
 		
+		-- NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/TransformWnd.lua");
+		-- local TransformWnd = commonlib.gettable("MyCompany.Aries.Game.Tasks.TransformWnd");
 		SelectBlocks.GetEventSystem():AddEventListener("OnSelectionChanged", OnTransformSelectionChanged, nil, "TransformWnd");
-		TransformWnd.ShowPage(cur_selection, {x=0, y=0, z=0,}, function(trans, res)
-			SelectBlocks.GetEventSystem():RemoveEventListener("OnSelectionChanged", OnTransformSelectionChanged);
-			if(trans and res == "ok") then
-				SelectBlocks.TransformSelection({dx=trans.x, dy=trans.y, dz=trans.z, pivot = self:GetPivotPoint(), rot_axis = trans.rot_axis, rot_angle=trans.rot_angle, 
-					scalingX = trans.scalingX, scalingY = trans.scalingY, scalingZ = trans.scalingZ, method = trans.method});
+		-- TransformWnd.ShowPage(cur_selection, {x=0, y=0, z=0, facing=0}, function(trans, res)
+		-- 	SelectBlocks.GetEventSystem():RemoveEventListener("OnSelectionChanged", OnTransformSelectionChanged);
+		-- 	if(trans and res == "ok") then
+		-- 		SelectBlocks.TransformSelection(trans.x, trans.y, trans.z, trans.facing*3.14/180, trans.scalingX, trans.scalingY, trans.scalingZ, trans.method);
+		-- 	end
+		-- end)
+	end
+end
+
+local function OnSelectionChanged()
+	local self = cur_instance;
+	if(self and cur_selection) then
+		NPL.load("(gl)script/Truck/SelectBlocksScale.lua");
+		local TransformWnd = commonlib.gettable("Mod.Truck.UI.SelectBlocksScale");
+		TransformWnd.UpdateHintLocation(cur_selection);
+	end
+end
+
+function SelectBlocks.ShowScalePage(pagetype)
+	SelectBlocks.temp_blocks = commonlib.clone(cur_selection);
+
+	local result_blocks = commonlib.clone(cur_selection);
+
+	if(cur_instance and cur_instance.aabb and cur_instance.aabb:IsValid() and #cur_selection > 0) then
+		local self = cur_instance;
+		
+		NPL.load("(gl)script/Truck/SelectBlocksScale.lua");
+		local SelectBlocksScale = commonlib.gettable("Mod.Truck.UI.SelectBlocksScale");
+		SelectBlocksScale.pagetype = pagetype or "scale";
+		SelectBlocks.GetEventSystem():AddEventListener("OnSelectionChanged", OnSelectionChanged, nil, "SelectBlocksScale");
+		SelectBlocksScale.ShowPage(cur_selection, {x=0, y=0, z=0, facing=0}, function(trans,settings, res)
+			SelectBlocks.GetEventSystem():RemoveEventListener("OnSelectionChanged", OnSelectionChanged);
+			if(trans and res == "ok") then		
+				if(settings.pagetype and settings.pagetype ~= "mirror") then
+					SelectBlocks.TransformSelection(trans.x, trans.y, trans.z, trans.facing*3.14/180, trans.scalingX, trans.scalingY, trans.scalingZ, trans.method);			
+				end	
+				
+
+				if(settings.pagetype and settings.pagetype == "mirror") then
+					-- NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/MirrorBlocksTask.lua");
+					-- local task = MyCompany.Aries.Game.Tasks.MirrorBlocks:new({method=settings.method, from_blocks=(SelectBlocks.temp_blocks), pivot_x=settings.pivot_x,pivot_y=settings.pivot_y,pivot_z=settings.pivot_z, mirror_axis=settings.xyz, })
+					-- task:Run();
+					for i=1, #result_blocks do
+						local b = result_blocks[i];
+						local x,y,z = SelectBlocksScale.GetMirrorPoint(b[1], b[2], b[3], settings.pivot_x, settings.pivot_y, settings.pivot_z, settings.xyz);
+						b[1] = x;
+						b[2] = y;
+						b[3] = z;
+					end
+					local aabb = ShapeAABB:new();
+					aabb:SetPointAABB(vector3d:new({result_blocks[1][1],result_blocks[1][2],result_blocks[1][3]}));
+					for i = 2, #result_blocks do
+						local b = result_blocks[i];
+						aabb:Extend(vector3d:new({b[1], b[2], b[3]}));
+					end
+
+					NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/TransformBlocksTask.lua");
+					local task = MyCompany.Aries.Game.Tasks.TransformBlocks:new({dx = trans.x, dy=trans.y, dz=trans.z, rot_y=trans.facing*3.14/180, scalingX=trans.scalingX, scalingY=trans.scalingY, scalingZ=trans.scalingZ, blocks=result_blocks, aabb=aabb, operation = "add"})
+					task:Run();
+				end
 			end
 		end)
 	end
 end
 
 -- @param trans: {dx,dy,dz, pivot, rot_axis, rot_angle, scalingX, scalingY, scalingZ, method}
--- @param method: nil or "clone" or "extrude"
+-- @param method: nil or "clone"
 function SelectBlocks.TransformSelection(trans)
 	if(cur_instance and cur_instance.aabb and cur_instance.aabb:IsValid() and #cur_selection > 0) then
 		local self = cur_instance;
 		local mExtents = cur_instance.aabb.mExtents;
 
 		local shift_pressed = ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_LSHIFT) or ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_RSHIFT);
-		if(trans.method == "extrude" or shift_pressed) then
-			-- if shift is pressed, we will extrude	
-			SelectBlocks.ExtrudeSelection(trans.dx, trans.dy, trans.dz);
-		else
+		if(not shift_pressed) then
 			self:UpdateSelectionEntityData();
 			NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/TransformBlocksTask.lua");
 			local task = MyCompany.Aries.Game.Tasks.TransformBlocks:new({dx = trans.dx, dy=trans.dy, dz=trans.dz, pivot = self:GetPivotPoint(), rot_axis = trans.rot_axis, rot_angle=trans.rot_angle, scalingX=trans.scalingX, scalingY=trans.scalingY, scalingZ=trans.scalingZ, blocks=cur_selection, aabb=cur_instance.aabb, operation = trans.method})
 			task:Run();
 
 			self:ReplaceSelection(commonlib.clone(task.final_blocks));
+			if(task.final_blocks and #task.final_blocks > 0) then
+				SelectBlocks.temp_blocks = commonlib.clone(task.final_blocks);
+				self:ReplaceSelection(commonlib.clone(task.final_blocks));
+			end
+			
+		else
+			-- if shift is pressed, we will extrude
+			SelectBlocks.ExtrudeSelection(trans.dx, trans.dy, trans.dz);
 		end
 	end
 end

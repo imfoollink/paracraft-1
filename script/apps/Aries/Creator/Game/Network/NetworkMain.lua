@@ -43,12 +43,13 @@ function NetworkMain:StartServer(host, port)
 end
 
 -- start server using tunnel service
-function NetworkMain:StartServerViaTunnel(host, port, room_key, username, password)
+function NetworkMain:StartServerViaTunnel(ip, port, username, password,callback)
     if(self:IsServerStarted()) then
 		return;
 	end
-	
-	LOG.std(nil, "info", "NetworkMain", "private server (%s:%s) is starting via tunnel...", host or "", port or "")
+	local host = "127.0.0.1";
+	local hostport = "0";
+	LOG.std(nil, "info", "NetworkMain", "starting via tunnel(%s:%s)...", ip or "", port or "")
 	self:InitCommon();
     
 	-- init server manager
@@ -61,9 +62,7 @@ function NetworkMain:StartServerViaTunnel(host, port, room_key, username, passwo
 	local TunnelClient = commonlib.gettable("MyCompany.Aries.Game.Network.TunnelClient");
 
 	-- reuse the same connection if possible
-	if(not self.tunnelClient) then
-		self.tunnelClient = TunnelClient:new();
-	end
+	self.tunnelClient = TunnelClient:new();
 	-- TODO: "_admin" means the first user in the room
 	username = username or "_admin";
 	username = self:SanitizeUsername(username);
@@ -72,16 +71,15 @@ function NetworkMain:StartServerViaTunnel(host, port, room_key, username, passwo
 	-- this is a pure client, so do not listen on any port. Just start the network interface. 
 	NPL.StartNetServer("127.0.0.1", "0");
 
-	self.tunnelClient:ConnectServer(host, port, room_key, username, password, function(result)
+	self.tunnelClient:ConnectServer(ip, port, username, password, function(result)
 		if(result) then
-			self.tunnelClient:LoginTunnel(function(result)
-				if(result) then
-					-- start server with the given tunnel client
-					self.server_manager = ServerManager.GetSingleton():Init(host, port, username, self.tunnelClient);
-				end
-			end);
+			-- start server with the given tunnel client
+			self.server_manager = ServerManager.GetSingleton():Init(host, hostport, username, self.tunnelClient);
         end
+		callback(result);
 	end)
+
+	return self.tunnelClient;
 end
 
 function NetworkMain:GetServerManager()
@@ -102,6 +100,9 @@ function NetworkMain:InitCommon()
 	NPL.load("(gl)script/apps/Aries/Creator/Game/Network/Packets/Packet_Types.lua");
 	local Packet_Types = commonlib.gettable("MyCompany.Aries.Game.Network.Packets.Packet_Types");
 	Packet_Types:StaticInit();
+	NPL.load("(gl)script/Truck/Network/PacketsExt/TruckPacketTypes.lua");
+	local TruckPacketTypes = commonlib.gettable("Mod.Truck.Network.PacketsExt.TruckPacketTypes");
+	TruckPacketTypes:StaticInit();
 
 	-- NPL.AddPublicFile("script/apps/WebServer/npl_http.lua", -10);
 	NPL.AddPublicFile("script/apps/Aries/Creator/Game/Network/ConnectionBase.lua", 201);
@@ -155,7 +156,7 @@ function NetworkMain:SanitizeUsername(username)
 end
 
 -- call this function to establish a connection to a given server via tunnel server
-function NetworkMain:ConnectViaTunnel(ip, port, room_key, username, password)
+function NetworkMain:ConnectViaTunnel(ip, port, hostname, username, password, callback)
 	if(not self:CheckLoadClient()) then
 		return;
 	end
@@ -164,17 +165,17 @@ function NetworkMain:ConnectViaTunnel(ip, port, room_key, username, password)
 	local TunnelClient = commonlib.gettable("MyCompany.Aries.Game.Network.TunnelClient");
 
 	-- reuse the same connection if possible
-	if(not self.tunnelClient) then
-		self.tunnelClient = TunnelClient:new();
-	end
+	self.tunnelClient = TunnelClient:new();
 	username = self:SanitizeUsername(username);
-
-	self.tunnelClient:ConnectServer(ip, port, room_key, username, password, function(result)
+	self.tunnelClient:setHostName(hostname);
+	self.tunnelClient:ConnectServer(ip, port,username, password, function(result)
 		if(result) then
 			-- connect with the given tunnel client
 			self:Connect(ip, port, username, password, self.tunnelClient);
 		end
+		callback(result);
 	end)
+	return self.tunnelClient;
 end
 
 -- call this function to establish a connection to a given server
@@ -195,6 +196,14 @@ function NetworkMain:Disconnect()
 	local client = self:GetClient("default");
 	if(client) then
 		client:Disconnect();
+	end
+
+	if(self.server_manager) then
+		self.server_manager:Shutdown();
+	end
+
+	if (self.tunnelClient) then
+		self.tunnelClient:Disconnect();
 	end
 end
 

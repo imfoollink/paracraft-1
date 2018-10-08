@@ -117,9 +117,9 @@ function World:InitBlockGenerator()
 				end
 				block_generator:SetFlatLayers(layers);
 
-			elseif(world_generator == "empty" or 
+			elseif(world_generator == "empty") then
 				-- Disable complex generator on mobile platform for the moment, since performance is really bad with current implementation. 
-				System.options.IsMobilePlatform) then
+				-- System.options.IsMobilePlatform) then
 				block_generator = self:GetChunkProvider():CreateGenerator("empty");
 			else
 				-- any custom generator by name. 
@@ -218,20 +218,20 @@ end
 function World:SetSpawnPoint(x,y,z)
 	local pos = GameLogic.GetFilters():apply_filters("BeforeSetSpawnPoint", {x,y,z});
 	if(pos) then
-		x,y,z = unpack(pos);
-		local entity = EntityManager.GetEntity("player_spawn_point")
-		if(not entity) then
-			NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/CreateBlockTask.lua");
-			local task = MyCompany.Aries.Game.Tasks.CreateBlock:new({block_id = block_types.names.player_spawn_point, blockX=x, blockY=y, blockZ=z})
-			task:Run();
-			entity = EntityManager.GetEntity("player_spawn_point")
-		end
-		if(entity) then
-			if(not x) then
-				x,y,z = ParaScene.GetPlayer():GetPosition();
-			end
-			entity:SetPosition(x,y,z);
-		end
+		-- x,y,z = unpack(pos);
+		-- local entity = EntityManager.GetEntity("player_spawn_point")
+		-- if(not entity) then
+		-- 	NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/CreateBlockTask.lua");
+		-- 	local task = MyCompany.Aries.Game.Tasks.CreateBlock:new({block_id = block_types.names.player_spawn_point, blockX=x, blockY=y, blockZ=z})
+		-- 	task:Run();
+		-- 	entity = EntityManager.GetEntity("player_spawn_point")
+		-- end
+		-- if(entity) then
+		-- 	if(not x) then
+		-- 		x,y,z = ParaScene.GetPlayer():GetPosition();
+		-- 	end
+		-- 	entity:SetPosition(x,y,z);
+		-- end
 	end
 	GameLogic.GetFilters():apply_filters("SetSpawnPoint", nil, x,y,z);
 	return x,y,z;

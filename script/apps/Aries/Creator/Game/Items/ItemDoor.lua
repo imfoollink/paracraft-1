@@ -32,6 +32,10 @@ local door_to_window_map = {
 	[233] = 109,
 	[230] = 194,
 	[231] = 195,
+	[519] = 521,
+	[520] = 522,
+	[531] = 533,
+	[532] = 534,
 }
 
 -- just incase the tooltip contains the image path

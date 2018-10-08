@@ -27,40 +27,90 @@ local clients = {};
 
 function TunnelClient:ctor()
 	self.virtualConns = {};
+	self.callback = nil
+	-- TODO: reuse connection to the same server
+	local conn = ConnectionBase:new();
+	conn:SetDefaultNeuronFile("script/apps/Aries/Creator/Game/Network/TunnelService/TunnelServer.lua");
+	self.conn = conn;
+end
+
+function TunnelClient:SetErrorCallback(cb)
+	if (self.conn) then
+		local tunnel = self
+		self.conn:SetNetHandler(
+			{
+				handleErrorMessage = 
+					function(self, msg)
+						while true do
+							local nid = next(tunnel.virtualConns);
+							if not nid then
+								break;
+							end
+
+							tunnel:RemoveVirtualConnection(nid);
+						end
+						cb(msg);
+					end
+			})
+	else
+		self.errorCallback = cb;
+	end
 end
 
 -- @param ip, port: IP address of tunnel server
--- @param room_key: room_key
 -- @param username: unique user name
 -- @param password: optional password
 -- @param callbackFunc: function(bSuccess) end
-function TunnelClient:ConnectServer(ip, port, room_key, username, password, callbackFunc)
-	clients[room_key] = self;
+function TunnelClient:ConnectServer(ip, port, username, password, callbackFunc)
+	self.callback = callbackFunc;
+	local nid = ip .. port
+	clients[nid] = self;
 	
-	LOG.std(nil, "info", "TunnelClient", {"connecting to", ip, port, room_key});
-	self.room_key = room_key;
+	LOG.std(nil, "info", "TunnelClient", {"connecting to", ip, port});
 	self.username = username;
 	self.password = password;
-	-- TODO: reuse connection to the same server
-	local conn = ConnectionBase:new();
-	local params = {host = tostring(ip or "127.0.0.1"), port = tostring(port or 8099), nid = room_key};
+	
+	local params = {host = tostring(ip), port = tostring(port), nid = tostring(nid)};
 	NPL.AddNPLRuntimeAddress(params);
-	conn:SetDefaultNeuronFile("script/apps/Aries/Creator/Game/Network/TunnelService/TunnelServer.lua");
-	conn:SetNid(room_key);
-	self.conn = conn;
+
+	local conn = self.conn;
+	conn:SetNid(nid);
+
+	conn:SetNetHandler(
+	{
+		handleErrorMessage = 
+			function(con, msg)
+				while true do
+					local nid = next(self.virtualConns);
+					if not nid then
+						break;
+					end
+
+					self:RemoveVirtualConnection(nid);
+				end
+				callbackFunc({type="tunnel_lost"});
+			end
+	})
 
 	conn:Connect(5, function(bSuccess)
 		self:SetConnected(bSuccess);
 		if(bSuccess) then
 			LOG.std(nil, "info", "TunnelClient", "successfully connected to tunnel server");
+			self:LoginTunnel()
 		else
-			LOG.std(nil, "info", "TunnelClient", "failed to connect to tunnel server: %s :%s (room_key: %s)", params.host, params.port, room_key or "");
-		end
-		if(callbackFunc) then
-			callbackFunc(bSuccess);
+			LOG.std(nil, "info", "TunnelClient", "failed to connect to tunnel server: %s :%s ", params.host, params.port);
+			self.callback({type = "tunnel_login", result = false});
 		end
 	end)
 	
+end
+
+function TunnelClient:setHostName(host)
+	self.hostname = host;
+end
+
+function TunnelClient:getHostName()
+	return self.hostname;
 end
 
 -- get virtual nid: use username directly as nid. it must be unique within the same room.
@@ -69,12 +119,30 @@ function TunnelClient:GetVirtualNid(username)
 end
 
 function TunnelClient:Disconnect()
-	-- TODO:
+	if(self.conn) then
+		self.conn:Send({type="tunnel_logout",  username=self.username}, nil)
+		self.conn:SetNetHandler(nil);
+		self.conn:CloseConnection();
+	end
+	self.conn = nil;
 end
 
 -- manage virtual connections
 function TunnelClient:AddVirtualConnection(nid, tcpConnection)
 	self.virtualConns[nid] = tcpConnection;
+end
+
+function TunnelClient:RemoveVirtualConnection(nid)
+	conn = self.virtualConns[nid];
+	if (conn) then
+		if conn.net_handler.handleErrorMessage then
+			conn.net_handler:handleErrorMessage("onConnectionLost")
+		end
+		conn.connectionClosed= true;
+	end
+	self.virtualConns[nid] = nil;
+	LOG.std(nil, "info", "TunnelClient", "%s disconnected",  nid);
+	
 end
 
 
@@ -85,23 +153,37 @@ end
 function TunnelClient:Send(nid, msg, neuronfile)
 	-- TODO; check msg, and route via tunnel server
 	if(self.conn) then
-		self.conn:Send({room_key=self.room_key, dest=nid, msg=msg}, nil)
+		self.conn:Send({dest=nid, msg=msg}, nil)
 	end
 end
 
 -- login with current user name
-function TunnelClient:LoginTunnel(callbackFunc)
+function TunnelClient:LoginTunnel()
 	-- send a tunnel login message
 	if(self.conn) then
-		self.conn:Send({type="tunnel_login", room_key=self.room_key, username=self.username, }, nil)
-		self.login_callback = callbackFunc;
+		self.conn:Send({type="tunnel_login",  username=self.username}, nil)
 	end
 end
 
+function TunnelClient:LogoutTunnel()
+	if (self.conn) then
+		self.conn:Send({type="tunnel_logout" }, nil)
+	end
+end
+
+function TunnelClient:ConnectHost()
+	if (self.conn and self.hostname) then
+		self.conn:Send({type="tunnel_connect", host = self.hostname}, nil)
+	end
+end
 
 function TunnelClient:handleRelayMsg(msg)
 	-- forward message
 	if(msg) then
+		if self.proxy and self.proxy:pickMessage(msg) then
+			return 
+		end
+
 		local conn = self.virtualConns[msg.nid];
 		if(not conn) then
 			-- accept connections if any
@@ -117,32 +199,46 @@ function TunnelClient:handleRelayMsg(msg)
 end
 
 function TunnelClient:handleCmdMsg(msg)
-	if(msg.type == "tunnel_login") then
+	local type = msg.type;
+	if(type == "tunnel_login") then
 		self:SetAuthenticated(msg.result == true);
-		LOG.std(nil, "info", "TunnelClient", "tunnel client `%s` is authenticated by the room_key: %s", self.username or "", self.room_key or "");
-		if(self.login_callback) then
-			self.login_callback(self:IsAuthenticated());
+		LOG.std(nil, "info", "TunnelClient", "tunnel client `%s` is authenticated : %s", self.username , msg.result);
+	elseif (type == "tunnel_connect") then
+		LOG.std(nil, "info", "TunnelClient", "host %s is connected: %s", self.username, msg.result);
+
+	elseif (msg.type=="tunnel_disconnect") then
+		conn = self.virtualConns[msg.target];
+		if (conn) then
+			if conn.net_handler.handleErrorMessage then
+				conn.net_handler:handleErrorMessage("onConnectionLost")
+			end
+			conn.connectionClosed= true;
 		end
-	else
-		-- other commands
+		self.virtualConns[msg.target] = nil;
+		LOG.std(nil, "info", "TunnelClient", "%s disconnected", msg.target);
+	elseif msg.type== "tunnel_ping" then
+		if (self.conn) then
+			self.conn:Send({type="tunnel_ping", username=self.username}, nil)
+		end
 	end
+
+	self.callback(msg);
+	
 end
 	
 
--- msg = {room_key, from=username, msg=orignal raw message}
+-- msg = { from=username, msg=orignal raw message}
 local function activate()
 	-- echo({"TunnelClient:receive--------->", msg})
 	local msg = msg;
-	local room_key = msg.room_key or msg.nid;
-	if(room_key) then
-		tunnelClient = clients[room_key];
-		if(tunnelClient) then
-			if(msg.type) then
-				tunnelClient:handleCmdMsg(msg);
-			else
-				msg.msg.nid = msg.from;
-				tunnelClient:handleRelayMsg(msg.msg);
-			end
+	local nid = msg.nid;
+	tunnelClient = clients[nid];
+	if(tunnelClient) then
+		if(msg.type) then
+			tunnelClient:handleCmdMsg(msg);
+		else
+			msg.msg.nid = msg.from;
+			tunnelClient:handleRelayMsg(msg.msg);
 		end
 	end
 end

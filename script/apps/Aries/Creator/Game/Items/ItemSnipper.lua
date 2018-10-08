@@ -53,19 +53,25 @@ function ItemSnipper:mousePressEvent(event)
 end
 
 function ItemSnipper:mouseMoveEvent(event)
-	GameLogic.GetSceneContext():CheckMousePick();
+
 end
 
 function ItemSnipper:mouseReleaseEvent(event)
+	if(event.mouse_button == "left") then
+		self:FireMissile();
+	elseif(event.mouse_button == "right") then
+		self:ToggleSnipperMode();
+	end
+	event:accept();
 end
 
 function ItemSnipper:keyPressEvent(event)
-	local dik_key = event.keyname;
-
-	if(GameLogic.GetSceneContext():HandleGlobalKey(event)) then
-	elseif(GameLogic.GetSceneContext():handlePlayerKeyEvent(event)) then
-	end	
-	event:accept();
+	--local dik_key = event.keyname;
+--
+	--if(GameLogic.GetSceneContext():HandleGlobalKey(event)) then
+	--elseif(GameLogic.GetSceneContext():handlePlayerKeyEvent(event)) then
+	--end	
+	--event:accept();
 end
 
 -- fire a missile
@@ -144,23 +150,23 @@ function ItemSnipper:FireMissile()
 		vOffset = vector3d:new({0,1,0}) * vDirection * (math.random(50,150)/1000);
 		local offset_x, offset_z  = vOffset[1], vOffset[3];
 		
-		if(EntityManager.GetPlayer():IsOnGround()) then
-			UIAnimManager.PlayCustomAnimation(300, function(elapsedTime)
-					local dX, dY, dZ;
-					if(elapsedTime < 50) then
-						local t = (elapsedTime/50);
-						dX = offset_x * t;
-						dY = offset_y * t;
-						dZ = offset_z * t;
-					else
-						local t = (1 - (elapsedTime-50)/250);
-						dX = offset_x * t;
-						dY = offset_y * t;
-						dZ = offset_z * t;
-					end
-					EntityManager.GetPlayer():SetPosition(old_x+dX, old_y+dY, old_z+dZ);
-				end);
-		end
+		--if(EntityManager.GetPlayer():IsOnGround()) then
+			--UIAnimManager.PlayCustomAnimation(300, function(elapsedTime)
+					--local dX, dY, dZ;
+					--if(elapsedTime < 50) then
+						--local t = (elapsedTime/50);
+						--dX = offset_x * t;
+						--dY = offset_y * t;
+						--dZ = offset_z * t;
+					--else
+						--local t = (1 - (elapsedTime-50)/250);
+						--dX = offset_x * t;
+						--dY = offset_y * t;
+						--dZ = offset_z * t;
+					--end
+					--EntityManager.GetPlayer():SetPosition(old_x+dX, old_y+dY, old_z+dZ);
+				--end);
+		--end
 	end
 end
 
@@ -232,7 +238,7 @@ end
 
 -- virtual function: when selected in right hand
 function ItemSnipper:OnSelect()
-	GameLogic.ToggleCamera(true);
+	GameLogic.ToggleCamera(3);
 	self:ToggleSnipperMode(false);
 	GameLogic.AddBBS("Snipper", L"射击模式：鼠标滚轮切换物品，Q键丢弃", 3000000, "0 255 0");
 end
@@ -240,7 +246,7 @@ end
 -- virtual function: when deselected in right hand
 function ItemSnipper:OnDeSelect()
 	self:ToggleSnipperMode(false);
-	GameLogic.ToggleCamera(false);
+	GameLogic.ToggleCamera(2);
 	GameLogic.AddBBS("Snipper", nil);
 end
 

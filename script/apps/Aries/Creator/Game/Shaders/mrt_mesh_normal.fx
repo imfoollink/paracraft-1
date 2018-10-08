@@ -1,6 +1,7 @@
 // Author: LiXizhi
 // Desc: 2013/10
 
+#include "CommonFunction.fx"
 #define ALPHA_TESTING_REF  0.5
 #define MAX_LIGHTS_NUM	4
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,6 +98,7 @@ BlockPSOut pixelShader(Interpolants i)
 	BlockPSOut output;
 	float4 o;
 	float4 normalColor = tex2D(tex0Sampler, i.tex.xy);
+  normalColor.rgb=gammaCorrectRead(normalColor.rgb);
 
 	if(g_bRGBOnlyTexturAnim)
 		normalColor.w = tex2D(tex0Sampler, i.tex.zw).w;
@@ -108,8 +110,7 @@ BlockPSOut pixelShader(Interpolants i)
 	}
 
 	o = normalColor;
-	o.rgb = o.rgb * colorDiffuse;
-
+	
 	o.rgb += colorEmissive;
 	o.w *= g_opacity;
 	

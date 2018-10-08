@@ -1,18 +1,13 @@
 #include "CommonDefine.fx"
 #include "FXAA.hlsl"
-
-#define SHADOW_BIAS 0.0025f
-
 float3 decodeNormal(float3 normal)
 {
 	return normal*2.0-1.0;
 }
-
 float calculateLightDiffuseFactor(float3 lightDirection,float3 normal)
 {
 	return saturate(dot(lightDirection,normal));
 }
-
 //1:no shadow
 //0£ºfull shadow
 float getShadowFactor(sampler2D s,float2 uv,float testDepth,float shadowMapSize,float invShadowMapSize)
@@ -21,7 +16,6 @@ float getShadowFactor(sampler2D s,float2 uv,float testDepth,float shadowMapSize,
 	return tex2D(s,float3(uv,testDepth));
 #else
 #ifdef PCF_SHADOW_ENABLE
-	// linear filtering the shadow map using 2*2 nearby texels to remove some aliasing
 	const float2 uv_in_texel_f=uv*shadowMapSize;
 	const float2 uv_in_texel_i=floor(uv_in_texel_f);
 	const float2 scalar=frac(uv_in_texel_f);
@@ -43,66 +37,43 @@ float getShadowFactor(sampler2D s,float2 uv,float testDepth,float shadowMapSize,
 #endif
 #endif
 }
-
-// shadow blending factor, so that the near camera shadow is darker
 float calculatefadeShadowFactor(float viewDepth,float shadowRadius)
 {
-	return saturate((viewDepth-shadowRadius*0.9)/(shadowRadius*0.1));
+	return saturate((viewDepth-shadowRadius)/(shadowRadius*0.1));
 }
-
-
-float calculateShadowFactor(sampler2D s,float4 worldPosition,float viewDepth,float4x4 shadowMatrix, float4x4 shadowViewProjMatrix,float shadowMapSize,float invShadowMapSize,float shadowRadius)
+float calculateShadowFactor(sampler2D s,float3 worldPosition,float viewDepth,float4x4 shadowMatrix,float shadowMapSize,float invShadowMapSize,float shadowRadius)
 {
-	const float4 vPosShadowSpace = mul(worldPosition, shadowViewProjMatrix);
-	const float4 vShadowMapCoord = mul(worldPosition, shadowMatrix);
-
-	if (viewDepth < shadowRadius && vPosShadowSpace.z > 0
-		//Avoid computing shadows past the shadow map projection
-		&& vShadowMapCoord.x < 1.0f && vShadowMapCoord.x > 0.0f && vShadowMapCoord.y < 1.0f && vShadowMapCoord.y > 0.0f 
-		/*// avoid shadow if the center point is not completely in shadow
-		&& (vPosShadowSpace.z - tex2D(s, vShadowMapCoord).r) >= SHADOW_BIAS
-		*/)
-	{
-		const float shadow_test_depth = vShadowMapCoord.z - SHADOW_BIAS;
-		const float2 uv = vShadowMapCoord.xy / vShadowMapCoord.w;
+	const float4 shadow_map_coord=mul(float4(worldPosition,1.0),shadowMatrix);
+	const float shadow_test_depth=shadow_map_coord.z-0.0025;
+	const float2 uv=shadow_map_coord.xy/shadow_map_coord.w;
 #ifdef SOFT_SHADOW_ENABLE
-		float ret = 0;
-		for (float i = -1.0f; i <= 1.0f; i += 1.0f)
-		{
-			for (float j = -1.0f; j <= 1.0f; j += 1.0f)
-			{
-				const float2 texelpos = uv + float2(i*invShadowMapSize, j*invShadowMapSize);
-				ret += getShadowFactor(s, texelpos, shadow_test_depth, shadowMapSize, invShadowMapSize);
-			}
-		}
-		ret /= 9;
-#else
-		float ret = getShadowFactor(s, uv, shadow_test_depth, shadowMapSize, invShadowMapSize);
-#endif
-		ret = lerp(ret, 1.0f, calculatefadeShadowFactor(viewDepth, shadowRadius));
-		return ret;
-	}
-	else
+	float ret=0;
+	for(float i=-1; i<=1; i+=1)
 	{
-		// not in shadow 
-		return 1.f;
+		for(float j=-1; j<=1; j+=1)
+		{
+			const float2 texelpos=uv+float2(i*invShadowMapSize,j*invShadowMapSize);
+			ret+=getShadowFactor(s,texelpos,shadow_test_depth,shadowMapSize,invShadowMapSize);
+		}
 	}
+	ret/=9;
+#else
+	float ret=getShadowFactor(s,uv,shadow_test_depth,shadowMapSize,invShadowMapSize);
+#endif
+	ret=lerp(ret,1.0,calculatefadeShadowFactor(viewDepth,shadowRadius));
+	return ret;
 }
-
-float4 brightPassFilter(sampler2D s,float2 uv)
+float4 brightPassFilter(sampler2D s,float2 uv,float luminance,float middleGray,float brightThreshold,float brightOffset)
 {
-	float Luminance=0.08f;
-	const float fMiddleGray=0.18f;
-	const float fWhiteCutoff=0.8f;
 	float3 ColorOut=tex2D(s,uv);
 
-	ColorOut*=fMiddleGray/(Luminance+0.001f);
-	ColorOut*=(1.0f+(ColorOut/(fWhiteCutoff * fWhiteCutoff)));
-	ColorOut-=5.0f;
+	ColorOut*=middleGray/(luminance+0.001f);
+	ColorOut-=brightThreshold;
 
 	ColorOut=max(ColorOut, 0.0f);
 
-	ColorOut/=(10.0f+ColorOut);
+	ColorOut/=(brightOffset+ColorOut);
+  ColorOut*=8;
 
 	return float4(ColorOut, 1.0f);
 }

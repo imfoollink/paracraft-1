@@ -56,9 +56,9 @@ function NetLoginHandler:InitializePlayerConnection()
     if (errorMsg) then
         self:KickUser(errorMsg);
     else
-        local playerEntity = self:GetServerManager():CreatePlayerForUser(self.clientUsername);
-        if (playerEntity) then
-            self:GetServerManager():InitializeConnectionToPlayer(self.playerConnection, playerEntity);
+        self.playerEntity = self:GetServerManager():CreatePlayerForUser(self.clientUsername);
+        if (self.playerEntity) then
+            self:GetServerManager():InitializeConnectionToPlayer(self.playerConnection, self.playerEntity);
         end
     end
 	self.finishedProcessing = true;
@@ -109,6 +109,7 @@ end
 
 function NetLoginHandler:handleLoginClient(packet_loginclient)
 	if(self:IsAuthenticated()) then
+		GameLogic.GetFilters():apply_filters("host_side_client_login_received",self, packet_loginclient);
 		self:InitializePlayerConnection();
 		self:InitializeEnvironment();
 	end

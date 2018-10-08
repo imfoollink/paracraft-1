@@ -278,6 +278,7 @@ function block:ReplaceTexture(filename, texture_index, bNoRestore)
 				if(not bNoRestore) then
 					self.new_texture = filename;
 				end
+				self.new_texture = filename;
 				ParaTerrain.SetTemplateTexture(self.id, filename);
 			-- @Note: following code is to replace one by one
 			--elseif(filename:match("_a%d%d%d%.png$")) then

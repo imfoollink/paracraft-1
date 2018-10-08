@@ -63,6 +63,7 @@ local var_name_to_text = {
 	parent = L"父链接",
 	color = L"颜色",
 	code = L"代码",
+	emoji = L"表情"
 }
 local var_longname_to_text = {
 	anim = L"动作 (1键)",
@@ -71,10 +72,11 @@ local var_longname_to_text = {
 	facing = L"转身 (3键)",
 	rot = L"三轴旋转 (3,3键)",
 	scaling = L"大小 (4键)",
+	emoji = L"表情 (5建)"
 }
 
-MovieClipTimeLine.timelineHeight = 12;
-MovieClipTimeLine.timeSliderHeight = 16;
+MovieClipTimeLine.timelineHeight = 24;
+MovieClipTimeLine.timeSliderHeight = 32;
 MovieClipTimeLine.height = MovieClipTimeLine.timelineHeight*2 + MovieClipTimeLine.timeSliderHeight;
 MovieClipTimeLine.maintainAspectRatio = true;
 
@@ -109,7 +111,7 @@ end
 
 -- set UI height. only valid during startup
 function MovieClipTimeLine:SetControlSize(timelineHeight, timeSliderHeight)
-	timelineHeight = timelineHeight or 12;
+	timelineHeight = timelineHeight or 24;
 	timeSliderHeight = timeSliderHeight or timelineHeight;
 	self.timelineHeight = timelineHeight;
 	self.timeSliderHeight = timeSliderHeight;
@@ -231,6 +233,7 @@ function MovieClipTimeLine.GetKeyFrameCtrl()
 			onremove_keyframe = MovieClipTimeLine.OnRemoveKeyFrame,
 			oncopy_keyframe = MovieClipTimeLine.OnCopyKeyFrame,
 			onmove_keyframe = MovieClipTimeLine.OnMoveKeyFrame,
+			key_button_height = MovieClipTimeLine.timelineHeight,
 			height = MovieClipTimeLine.timelineHeight,
 		});
 	end	
@@ -264,6 +267,7 @@ function MovieClipTimeLine.GetSubFrameCtrl()
 			oncopy_keyframe = MovieClipTimeLine.OnCopyKeySubFrame,
 			onmove_keyframe = MovieClipTimeLine.OnMoveKeySubFrame,
 			isShowDataOnTooltip = true,
+			key_button_height = MovieClipTimeLine.timelineHeight,
 			height = MovieClipTimeLine.timelineHeight,
 		});
 	end	
@@ -833,7 +837,7 @@ function MovieClipTimeLine.OnChangeEndTime()
 		if(value) then
 			value = tonumber(value);
 			if(value) then
-				if(value>=0) then
+				if(value>=0 and value<=3600) then
 					page:SetNodeValue("endtime", value);
 					local movieClip = MovieManager:GetActiveMovieClip();
 					if(movieClip) then

@@ -54,7 +54,7 @@ function ServerManager:ctor()
 	-- index into playerEntities of player to ping, updated every tick;
     self.playerPingIndex = 1;
 	-- The maximum number of players that can be connected at a time.
-	self.max_players = 8;
+	self.max_players = 32;
 	self.view_distance = 200;
 end
 
@@ -265,6 +265,7 @@ function ServerManager:CreatePlayerForUser(username)
 		local player = EntityManager.EntityPlayerMP:new():init(username, world);
 		if(player) then
 			self.playerEntityList:add(player);
+			GameLogic.GetFilters():apply_filters("host_side_player_created", player);
 			return player;
 		end
 	end

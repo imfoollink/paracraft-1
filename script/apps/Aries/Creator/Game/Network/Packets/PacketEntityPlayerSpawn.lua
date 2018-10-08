@@ -20,18 +20,21 @@ end
 
 function PacketEntityPlayerSpawn:Init(entity)
 	self.entityId = entity.entityId;
-    self.name = entity:GetUserName();
-    self.x = math.floor(entity.x * 32);
-    self.y = math.floor(entity.y * 32);
-    self.z = math.floor(entity.z * 32);
-    self.facing = math.floor((entity.rotationYaw or entity.facing or 0) * 32);
-    self.pitch = math.floor(entity.rotationPitch * 32);
-    
+	self.name = entity:GetUserName();
+	self.x = math.floor(entity.x * 32);
+	self.y = math.floor(entity.y * 32);
+	self.z = math.floor(entity.z * 32);
+	self.facing = math.floor((entity.rotationYaw or entity.facing or 0) * 32);
+	self.pitch = math.floor(entity.rotationPitch * 32);
+	
 	-- for watched data fields
 	local dataWatcher  = entity:GetDataWatcher();
 	if(dataWatcher) then
 		self.metadata = dataWatcher:GetAllObjectList();
 	end
+
+	GameLogic.GetFilters():apply_filters("packet_entity_player_spawn_inited", self);
+
 	return self;
 end
 
@@ -47,7 +50,7 @@ end
 
 -- the list of watcheble objects
 function PacketEntityPlayerSpawn:GetMetadata()
-    return self.metadata;
+	return self.metadata;
 end
 
 

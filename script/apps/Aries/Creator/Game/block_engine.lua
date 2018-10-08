@@ -75,6 +75,7 @@ local offset_y = BlockEngine.offset_y;
 
 local custom_model_load_map = {};
 local eye_pos = {};
+local block_region_loaded={};
 
 -- set the current game logic to use. 
 function BlockEngine:SetGameLogic(game_logic)
@@ -87,6 +88,7 @@ function BlockEngine:Connect()
 	-- clear the block cache
 	self.block_cache = {};
 	custom_model_load_map = {};
+  block_region_loaded={};
 
 	local x, y, z = ParaScene.GetPlayer():GetPosition();
 	ParaScene.GetPlayer():SetField("IsAlwaysAboveTerrain", false);
@@ -168,6 +170,7 @@ function BlockEngine.OnLoadBlockRegion()
 	end
 	LOG.std(nil, "system", "BlockEngine", "loading block region %d %d", msg.x, msg.y);
 	local region_id = msg.x*100000+msg.y;
+  block_region_loaded[region_id]=true;
 	if(custom_model_load_map[region_id]) then
 		return;
 	end
@@ -195,6 +198,8 @@ function BlockEngine.OnLoadBlockRegion()
 			end
 		end
 	end
+  
+  GameLogic.GetFilters():apply_filters("OnLoadBlockRegion2", true, msg.x, msg.y);
 end
 
 function BlockEngine.OnUnLoadBlockRegion()
@@ -205,6 +210,8 @@ function BlockEngine.OnUnLoadBlockRegion()
 	end
 	if(not BlockEngine:IsRemote()) then
 		LOG.std(nil, "system", "BlockEngine", "unloading block region %d %d", msg.x, msg.y);
+    local region_id = msg.x*100000+msg.y;
+    block_region_loaded[region_id]=false;
 	end
 end
 
@@ -1132,4 +1139,7 @@ function BlockEngine:Dump()
 	echo({eye_block = self.eye_block, eye = self.eye, min_y = self.min_y, max_y = self.max_y});
 end
 
-
+function BlockEngine:isBlockRegionLoaded(x,z)
+	local region_id = x*100000+z;
+  return block_region_loaded[region_id];
+end

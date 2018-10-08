@@ -16,8 +16,13 @@ function ClosePage()
 end
 
 ]]></script>
-<aries:window mode="thin" title='<%=L"人物属性"%>' onclose="ClosePage">
-<div style="padding:10px;padding-bottom:15px;color:#cccccc">
+<!-- <aries:window mode="thin" title='<%=L"人物属性"%>' onclose="ClosePage"> -->
+
+<pe:container alignment="_ct" style="margin-left:-240px;margin-top:-138px;texpack:addr_by_id(movieedit_PC->17.png);">
+
+<input type="button" name="close" style="margin-left:420px;margin-top:13px;texpack:addr_by_id(movieedit_PC->22.png);" onclick="ClosePage()" />
+
+<div style="padding:10px;padding-bottom:15px;color:#ffffff;font-weight:bold;font-size:18px;base-font-size:18px;margin-left:15px">
     <div style="float:left;margin-top:3px;margin-left:5px;padding:2px;background:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#308 89 34 34)">
         <pe:mc_block block_id='<%=MobPropertyPage.GetItemID()%>' style="width:32px;height:32px;"/>
     </div>
@@ -54,7 +59,11 @@ end
         <input type="button" name="OK"  value='<%=L"确定"%>' class="mc_light_grey_button_with_fillet" style="min-width:80px;" onclick="MobPropertyPage.OnClickOK"/>
     </div>
 </div>
-</aries:window>
+
+</pe:container>
+
+<!-- </aries:window> -->
+
 </pe:mcml>
 </body>
 </html>

@@ -1,0 +1,64 @@
+<!-- "script/apps/Aries/Creator/Game/Tasks/SelectModelTask.PC.html" -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" >
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title></title>
+</head>
+<body>
+<pe:mcml>
+<script refresh="true" type="text/npl" src="SelectModelTask.lua"><![CDATA[
+SelectModel = commonlib.gettable("MyCompany.Aries.Game.Tasks.SelectModel")
+SelectModel.OnInit()
+
+
+function GetParams()
+    return SelectModel.GetObjParams();
+end
+
+function IsCharacter()
+    return SelectModel.IsCharacterSelected();
+end
+
+function OnClose()
+    SelectModel.EndEditing(true);
+end
+]]></script>
+
+<pe:container style="texpack:addr_by_id(NPCEditor->01.png);">
+    <!-- close btn -->
+    <pe:container alignment="_rt" style="position:relative;background: ;margin-left:10px;margin-top:10px;">
+        <input type="button" name="OnClose" style="position:absolute;width:36px;height:36px;texpack:addr_by_id(NPCEditor->00.png);"onclick="OnClose" />
+    </pe:container>
+
+    <div style="width:240px;height:200px;">
+        <div style="margin-left:30px;margin-top:0px;">
+            <pe:if condition='<%=SelectModel.IsEntity() %>'>
+                <pe:mc_entity_canvas entity='<%=SelectModel.GetEntity()%>' miniscenegraphname="NPCDialog_miniscene" style="width:200px;height:200px;" background="" IsInteractive="false" />
+            </pe:if>
+            <pe:if condition='<%=not SelectModel.IsEntity() %>'>
+                <pe:canvas3d miniscenegraphname="LeftTopCanvas128" RenderTargetSize="128" autoRotateSpeed="0.12" style="width:128;height:128;" value='<%=GetParams()%>' />
+            </pe:if>
+        </div>
+    </div>
+
+    <div style="margin-left:50px;margin-top:10px;">
+        <input type="button" style="margin-left:0px;margin-top:0px;font-size:32px;texpack:addr_by_id(NPCEditor->02.png);" tooltip='<%=L"Shift+左键点击场景移动,Ctrl+左键复制"%>' name="move" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
+        <input type="button" style="margin-left:32px;margin-top:0px;font-size:32px;texpack:addr_by_id(NPCEditor->08.png);" tooltip='<%=L"快捷键 Del"%>' name="remove" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/><br/>
+        <input type="button" style="margin-left:0px;margin-top:12px;font-size:32px;texpack:addr_by_id(NPCEditor->04.png);" tooltip='<%=L"快捷键 ["%>' name="left_rot" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
+        <input type="button" style="margin-left:32px;margin-top:12px;font-size:32px;texpack:addr_by_id(NPCEditor->10.png);" tooltip='<%=L"快捷键 ]"%>' name="right_rot" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/><br/>
+        <input type="button" style="margin-left:0px;margin-top:12px;font-size:32px;texpack:addr_by_id(NPCEditor->40.png);" tooltip='<%=L"快捷键 -"%>' name="descale" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
+        <input type="button" style="margin-left:32px;margin-top:12px;font-size:32px;texpack:addr_by_id(NPCEditor->39.png);" tooltip='<%=L"快捷键 +"%>' name="scale" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/><br/>
+        <pe:if condition='<%=IsCharacter() %>'>
+            <input type="button" style="margin-left:0px;margin-top:12px;font-size:32px;texpack:addr_by_id(NPCEditor->06.png);" name="property" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
+            <input type="button" style="margin-left:32px;margin-top:12px;font-size:32px;texpack:addr_by_id(NPCEditor->12.png);" name="simple_talk" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/><br/>
+            
+            <!-- <input type="button" style="margin-left:5px;margin-top:12px;texpack:addr_by_id(selectmodel_PC->06.png);" value='<%=L"属性"%>' tooltip="" name="property" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/>
+            <input type="button" style="margin-left:5px;margin-top:12px;texpack:addr_by_id(selectmodel_PC->12.png);" value='<%=L"逻辑"%>' tooltip="" name="simple_talk" onclick="SelectModel.DoClick" class="mc_light_grey_button_with_fillet"/> -->
+        </pe:if>
+    </div>
+</pe:container>
+</pe:mcml> 
+</body>
+</html>
+

@@ -50,10 +50,14 @@ function EditMovieTextPage.ShowPage(title, OnClose, last_values)
 			app_key = MyCompany.Aries.Creator.Game.Desktop.App.app_key, 
 			directPosition = true,
 				align = "_ct",
-				x = -320,
-				y = -250,
-				width = 640,
-				height = 300,
+				-- x = -320,
+				-- y = -250,
+				-- width = 640,
+				-- height = 300,
+				x = -240,
+				y = -138,
+				width = 479,
+				height = 276,
 		};
 	System.App.Commands.Call("File.MCMLWindowFrame", params);
 

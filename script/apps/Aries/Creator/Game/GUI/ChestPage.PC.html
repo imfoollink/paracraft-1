@@ -1,4 +1,4 @@
-﻿<!-- "script/apps/Aries/Creator/Game/GUI/ChestPage.html" -->
+<!-- "script/apps/Aries/Creator/Game/GUI/ChestPage.PC.html" -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -38,44 +38,40 @@ end
 
 ]]></script>
 <!-- <pe:container alignment="_ct" style="background:url(gameassets\textures\ui_23_offline\1.png:8 8 8 8)"> -->
-<pe:container alignment="_ct" width="50%" height="50%" style="margin-left:-240px;margin-top:-220px;texpack:addr_by_id(NewBuilderFrame->126.png)">
+<pe:container alignment="_ct" style="margin-left:-317px;margin-top:-325px;texpack:addr_by_id(inventory_PC->1.png)">
     <!-- close btn -->
-    <pe:container alignment="_rt" style="position:relative;background: ;margin-left:5px;margin-top:5px;">
-        <input type="button" name="ClosePage" style="position:absolute;width:36px;height:36px;background:url(gameassets\textures\ui_23_offline\10.png) ; "onclick="ClosePage" />
+    <pe:container alignment="_rt" style="position:relative;background: ;margin-left:10px;margin-top:10px;">
+        <input type="button" name="ClosePage" style="position:absolute;texpack:addr_by_id(inventory_PC->3.png); "onclick="ClosePage" />
     </pe:container>
-    <!-- title -->
-    <img alignment="_ct" style="margin-top:5px;margin-left:260px;height:36px;width:72px;background:url(gameassets\textures\ui_09_bag\chest_title.png)"/>
-
     <!-- <div style="padding:10px;color:#cccccc"> -->
     <div>
-        <div style="margin-left:16px;font-size:16px;margin-top:-5px;">
+        <!-- <div style="margin-left:16px;font-size:16px;margin-top:-5px;">
             <div style="float:left;padding-left:5px;padding-right:5px;" class="mc_light_grey_button_with_fillet">Shift</div>
             <div style="float:left;margin-left:5px;color:#cccccc">+</div>
             <div style="float:left;margin-top:4px;width:11px;height:13px;background:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#33 186 11 13)"/>
             <div style="float:left;margin-left:5px;color:#cccccc"><%=L": 一键提取物品"%></div>
-        </div>
-        <pe:gridview name="ChestBagItems" style="margin-left:12px;margin-top:2px;height:190px;" DataSource="<%=DS_Func_Items%>" CellPadding="4" DefaultNodeHeight = "34" ItemsPerLine="9" AllowPaging="false" RememberScrollPos="true" RememberLastPage="true" pagesize="27">
+        </div> -->
+        <pe:gridview name="ChestBagItems" style="margin-left:5px;margin-top:110px;height:220px;" DataSource="<%=DS_Func_Items%>" CellPadding="4" DefaultNodeHeight = "34" ItemsPerLine="9" AllowPaging="false" RememberScrollPos="true" RememberLastPage="true" pagesize="27">
             <Columns>
-                <div style="margin-left:2px;font-weight:bold;" class="mc_item">
-                    <pe:mc_slot ContainerView='<%=GetContainerView()%>' DestInventory='<%=EntityManager.GetPlayer().inventory %>' bagpos ='<%=Eval("slotNumber")%>' style="margin:1px;width:54px;height:54px;"></pe:mc_slot>
+                <div style="margin-left:0px;font-weight:bold;" class="mc_item">
+                    <pe:mc_slot ContainerView='<%=GetContainerView()%>' DestInventory='<%=EntityManager.GetPlayer().inventory %>' bagpos ='<%=Eval("slotNumber")%>' style="margin:0px;width:64px;height:64px;"></pe:mc_slot>
                 </div>
 			</Columns>
         </pe:gridview>
     </div>
 
-    <div class="mc_line" width="100%" height="1"></div>
-    <div style="margin-top:12px;">
-        <div style="margin-left:16px;font-size:16px;margin-bottom:2px;">
+    <!-- <div class="mc_line" width="100%" height="1"></div> -->
+    <div style="margin-top:32px;">
+        <!-- <div style="margin-left:16px;font-size:16px;margin-bottom:2px;">
             <div style="float:left;padding-left:5px;padding-right:5px;" class="mc_light_grey_button_with_fillet">Shift</div>
             <div style="float:left;margin-left:5px;color:#cccccc">+</div>
             <div style="float:left;margin-top:4px;width:11px;height:13px;background:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#33 186 11 13)"/>
             <div style="float:left;margin-left:5px;color:#cccccc"><%=L": 一键放置物品"%></div>
-            <!-- <div style="float:left;margin-left:25px;color:#cccccc;font-size:32px;"><%=L"背包"%></div> -->
-        </div>
-        <pe:gridview name="ChestMyItems" style="margin-left:12px;margin-top:2px;height:250px;" DataSource="<%=DS_Func_PlayerItems%>" CellPadding="4" DefaultNodeHeight = "34" ItemsPerLine="9" AllowPaging="false" RememberScrollPos="true" RememberLastPage="true" pagesize="36">
+        </div> -->
+        <pe:gridview name="ChestMyItems" style="margin-left:5px;margin-top:0px;height:400px;" DataSource="<%=DS_Func_PlayerItems%>" CellPadding="4" DefaultNodeHeight = "34" ItemsPerLine="9" AllowPaging="false" RememberScrollPos="true" RememberLastPage="true" pagesize="36">
             <Columns>
-                <div style="margin-left:2px;font-weight:bold;" class="mc_item">
-                    <pe:mc_slot bagpos ='<%=Eval("slotNumber")%>' DestInventory='<%=ChestPage.GetEntity().inventory %>' style="margin:1px;width:54px;height:54px;"></pe:mc_slot>
+                <div style="margin-left:0px;font-weight:bold;" class="mc_item">
+                    <pe:mc_slot bagpos ='<%=Eval("slotNumber")%>' DestInventory='<%=ChestPage.GetEntity().inventory %>' style="margin:0px;width:64px;height:64px;"></pe:mc_slot>
                 </div>
 			</Columns>
         </pe:gridview>

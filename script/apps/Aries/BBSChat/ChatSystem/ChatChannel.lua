@@ -67,7 +67,7 @@ local Player = commonlib.gettable("MyCompany.Aries.Player");
 
 ChatChannel.channels = {
 --{name=""},
-{name="附近",bshow=true,color="f9f7d4",},
+{name="综合",bshow=true,color="eb9e4d",},
 {name="小队",bshow=true,color="00dcff",},
 {name="单聊",bshow=true,color="fe74ff", default_channel_text="@ "},
 {name="家族",bshow=true,color="44e71e",},
@@ -347,7 +347,14 @@ function ChatChannel.OnProcessMsg(msgdata)
 			if(not System.options.mc) then
 				words = SmileyPage.ChangeToMcml(pure_text, 64);
 			end
-			headon_speech.Speek(player.name, words, 5, true);
+      NPL.load("(gl)script/Truck/Utility/ChatCoder.lua");
+      local ChatCoder=commonlib.gettable("Truck.Utility.ChatCoder");
+      local decoded=ChatCoder.decode(words);
+      if decoded then
+        headon_speech.Speek(player.name, decoded.mText, 5, true);
+      else
+        headon_speech.Speek(player.name, words, 5, true);
+      end
 		end
 	end
 

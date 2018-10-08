@@ -52,8 +52,8 @@ function DefaultTheme:Load()
 	System.options.tradable_bag_family = {0,1,3,23,25,12,13,14};
 
 	local version = commonlib.getfield("System.options.version");
-    System.options.haqi_RMB_Currency="Ä§¶¹";
-    System.options.haqi_GameCurrency="Ææ¶¹";
+    System.options.haqi_RMB_Currency="Ä§ï¿½ï¿½";
+    System.options.haqi_GameCurrency="ï¿½æ¶¹";
 
 	-- how many minutes are there in a day.
 	-- ParaScene.SetDayLength(900);
@@ -919,7 +919,7 @@ function DefaultTheme:Load()
 		{name = "Aries.UI.LoaderUI.logoTxt", type="container",bg="", alignment = "_rb", left=-320-20, top=-20-5, width=320, height=20, anim="script/kids/3DMapSystemUI/InGame/LoaderUI_2_motion.xml"},
 		{name = "Aries.UI.LoaderUI.logo", type="container",bg="", alignment = "_ct", left=-512/2, top=-290/2, width=512, height=128, anim="script/kids/3DMapSystemUI/InGame/LoaderUI_2_motion.xml"},
 		{name = "Aries.UI.LoaderUI.progressbar_bg", type="container",bg="Texture/Aries/Loader/loading_panel_32bits.png: 60 60 60 60", alignment = "_ct", left=-240, top=-90, width=480, height=128, anim="script/kids/3DMapSystemUI/InGame/LoaderUI_2_motion.xml"},
-		{name = "Aries.UI.LoaderUI.text", type="text", text="ÕýÔÚ¼ÓÔØ¹þÆæÐ¡Õò...", color = "255 255 255", alignment = "_ct", left=-100+10, top=28, width=200, height=20, anim="script/kids/3DMapSystemUI/InGame/LoaderUI_2_motion.xml"},
+		{name = "Aries.UI.LoaderUI.text", type="text", text="ï¿½ï¿½ï¿½Ú¼ï¿½ï¿½Ø¹ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½...", color = "255 255 255", alignment = "_ct", left=-100+10, top=28, width=200, height=20, anim="script/kids/3DMapSystemUI/InGame/LoaderUI_2_motion.xml"},
 		{name = "Aries.UI.LoaderUI.gossip", type="text", texts={
 			"dummy",
 
@@ -938,6 +938,8 @@ function DefaultTheme:Load()
 	local default_stack = BroadcastHelper.GetSingletonTipsStack();
 	default_stack.background = "Texture/Aries/Common/gradient_white_32bits.png";
 	default_stack.background_color = "#1f3243";
+	default_stack.font_size = 28;
+	default_stack.LineHeight = 44;
 
 	NPL.load("(gl)script/kids/3DMapSystemApp/Assets/AsyncLoaderProgressBar.lua");
 	local AsyncLoaderProgressBar = commonlib.gettable("Map3DSystem.App.Assets.AsyncLoaderProgressBar");
@@ -1040,11 +1042,13 @@ function DefaultTheme:LoadHeadDisplayStyle()
 
 	NPL.load("(gl)script/ide/headon_speech.lua");
 	headon_speech.dialog_bg = "Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png;32 114 38 39:29 8 8 16";
-	headon_speech.padding = 8;
-	headon_speech.padding_bottom = 24;
-	headon_speech.min_height = 20;
-	headon_speech.min_width = 46;
-	headon_speech.margin_bottom = 24;
-	headon_speech.default_font= "System;14;";
+	headon_speech.padding = 10;
+	headon_speech.padding_bottom = 30;
+	headon_speech.min_height = 70;
+	headon_speech.max_height = 420;
+	headon_speech.min_width = 70;
+	headon_speech.max_width = 420;
+	headon_speech.margin_bottom = -10;
+	headon_speech.default_font= "System;30;";
 	headon_speech.text_color= "196 196 196";
 end

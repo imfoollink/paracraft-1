@@ -30,7 +30,7 @@ Module Overview
 
 ## tunnelserver    	
    * {room_key, {nid, ...}}
-   * API:b
+   * API:
       * for gateway: tunnelserver.API.upsertRoom({room_key, {nid, ...}})  (updateAndInsert)
       * for tunnelclient: tunnelserver.API.relayMsg({room_key})
 

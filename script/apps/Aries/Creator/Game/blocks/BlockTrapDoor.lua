@@ -38,15 +38,26 @@ function block:ctor()
 end
 
 local associated_block_ids = {
+	-- wood door
 	[232] = {[232] = true, [233]=true, [108] = true, [109]=true},
 	[233] = {[231] = true, [233]=true, [108] = true, [109]=true},
 	[108] = {[231] = true, [233]=true, [108] = true, [109]=true},
 	[109] = {[231] = true, [233]=true, [108] = true, [109]=true},
-
+	-- iron door
 	[194] = {[194] = true, [195]=true, [230] = true, [231]=true},
 	[195] = {[194] = true, [195]=true, [230] = true, [231]=true},
 	[230] = {[194] = true, [195]=true, [230] = true, [231]=true},
 	[231] = {[194] = true, [195]=true, [230] = true, [231]=true},
+	-- helka tech door
+	[521] = {[521] = true, [522]=true, [519] = true, [520]=true},
+	[522] = {[521] = true, [522]=true, [519] = true, [520]=true},
+	[519] = {[521] = true, [522]=true, [519] = true, [520]=true},
+	[520] = {[521] = true, [522]=true, [519] = true, [520]=true},
+		-- helka space door
+	[533] = {[533] = true, [534]=true, [531] = true, [532]=true},
+	[534] = {[533] = true, [534]=true, [531] = true, [532]=true},
+	[531] = {[533] = true, [534]=true, [531] = true, [532]=true},
+	[532] = {[533] = true, [534]=true, [531] = true, [532]=true},
 }
 
 -- return true if the block_id is associated block, such as an open door and closed door. 
@@ -177,7 +188,7 @@ end
 
 -- revert back to unpressed state
 function block:updateTick(x,y,z)
-    if(not GameLogic.isRemote) then
+	if(not GameLogic.isRemote) then
 	end
 end
 
@@ -191,7 +202,7 @@ function block:RotateBlockData(blockData, angle, axis)
 	-- rotation around axis
 	if(axis == "y") then
 		local side = data_to_side[blockData or 0];
-		if(side < 4) then
+		if(side <= 4) then
 			local facing = Direction.directionTo3DFacing[side];
 			blockData = side_to_data[Direction.GetDirectionFromFacing(facing + angle)];
 		end
@@ -200,5 +211,6 @@ function block:RotateBlockData(blockData, angle, axis)
 	end
 	return blockData;
 end
+
 
 

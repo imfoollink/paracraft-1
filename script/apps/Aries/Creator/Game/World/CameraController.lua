@@ -16,6 +16,8 @@ NPL.load("(gl)script/apps/Aries/Desktop/GUIHelper/ClickToContinue.lua");
 NPL.load("(gl)script/ide/math/vector.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/TouchController.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/World/StereoVisionController.lua");
+NPL.load("(gl)script/Truck/Utility/MessageSource.lua");
+local MessageSourceContainer=commonlib.gettable("Mod.Truck.Utility.MessageSourceContainer");
 local StereoVisionController = commonlib.gettable("MyCompany.Aries.Game.StereoVisionController")
 local TouchController = commonlib.gettable("MyCompany.Aries.Game.GUI.TouchController");
 local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
@@ -39,6 +41,8 @@ local CameraModes = {
 	ThirdPersonFreeLooking = 0,
 	FirstPerson = 1,
 	ThirdPersonLookCamera = 2,
+	ShootingGame = 3,
+	TopView = 4,
 }
 
 local camera_mode = CameraModes.ThirdPersonFreeLooking;
@@ -56,6 +60,8 @@ local camera = {prevPosX=0, prevPosY=0, prevPosZ=0, distanceWalkedModified=0, pr
 -- temporary params. do not use it externally. 
 local camera_params = {};
 
+CameraController.EMessage={BeginOnCameraFrameMove=1}
+
 function CameraController.OnInit()
 	CameraController:InitSingleton();
 	local attr = ParaCamera.GetAttributeObject();
@@ -68,6 +74,7 @@ function CameraController.OnInit()
 	attr:SetField("CameraRollbackSpeed", GameLogic.options.CameraRollbackSpeed or 6);
 	-- "EnableMouseLeftDrag" boolean attribute is added to ParaCamera.
 	attr:SetField("EnableMouseLeftDrag", GameLogic.options.isMouseLeftDragEnabled == true);
+	CameraController.mMessageSourceContainer=MessageSourceContainer:new();
 end
 
 function CameraController.OnExit()
@@ -115,7 +122,7 @@ function CameraController.OnFPSMouseTimer()
 			ParaUI.LockMouse(false);
 			ParaUI.GetUIObject("FPS_Cursor").visible = false;
 			att:SetField("IsAlwaysRotateCameraWhenFPS", false);
-		else
+		elseif not CameraController.cursorState then
 			-- lock mouse if no top level window is there
 			ParaUI.ShowCursor(false);
 			if(not System.options.IsMobilePlatform) then
@@ -149,23 +156,20 @@ end
 
 -- may also toggle UI. 
 -- toggle between 3 modes
--- @param IsFPSView: nil to toggle, otherwise to set
-function CameraController.ToggleCamera(IsFPSView)
+function CameraController.ToggleCamera(viewmode)
 	local self = CameraController;
-	if(IsFPSView == nil) then
-		self:SetMode((CameraController:GetMode()+1)%3);
-		IsFPSView = CameraController:GetMode() == CameraModes.FirstPerson;
+	if(viewmode == nil) then
+		self:SetMode((CameraController:GetMode()+1)%2);
 	else
-		if(IsFPSView) then
-			self:SetMode(CameraModes.FirstPerson);
-		else
-			self:SetMode(CameraModes.ThirdPersonFreeLooking);
-		end
+		self:SetMode(viewmode);
+		
 	end
-
-	GameLogic.IsFPSView = IsFPSView;
+	local curMode = CameraController:GetMode();
+	GameLogic.IsFPSView = curMode == CameraModes.FirstPerson;
 	local att = ParaCamera.GetAttributeObject();
-	if(IsFPSView) then
+	if(curMode == CameraModes.FirstPerson) then
+		att:SetField("BlockInput",false);
+
 		-- eye position is 1.5 meters
 		att:SetField("MaxCameraObjectDistance", 0.3);
 		att:SetField("NearPlane", 0.1);
@@ -179,15 +183,15 @@ function CameraController.ToggleCamera(IsFPSView)
 		att:SetField("IsShiftMoveSwitched", true);
 		
 		att:SetField("EnableMouseWheel", false);
+		att:SetField("CameraLookatOffset",{0, 0, 0})
 		
 
 		ParaScene.GetPlayer():SetDensity(1);
 
 		if(CameraController.IsAlwaysRotateCameraWhenFPS) then
 			if(not System.options.IsMobilePlatform) then
-				att:SetField("IsAlwaysRotateCameraWhenFPS", true);
-				ParaUI.ShowCursor(false);
-				ParaUI.LockMouse(true);
+				CameraController.ToggleCursor(false, true);
+
 				local root_ = ParaUI.GetUIObject("root")
 				local _, _, width_screen, height_screen = root_:GetAbsPosition();
 				root_:GetAttributeObject():SetField("MousePosition", {width_screen / 2, height_screen / 2});
@@ -215,12 +219,101 @@ function CameraController.ToggleCamera(IsFPSView)
 			CameraController.FPS_MouseTimer = CameraController.FPS_MouseTimer or commonlib.Timer:new({callbackFunc = CameraController.OnFPSMouseTimer})
 			CameraController.FPS_MouseTimer:Change(500,500);
 		end
+	elseif curMode == CameraModes.ShootingGame then
+		att:SetField("BlockInput",false);
+
+		-- MaxCameraObjectDistance: (0 ,0.5] FirstPersonView, (0.5 ~ 1) FirstPersonalControl , [1 ~ oo] ThirdPersonView and ThridPersonControl
+		att:SetField("MaxCameraObjectDistance", 0.9);
+		att:SetField("CameraObjectDistance", 4);
+		att:SetField("CameraLookatOffset",{-0.8, 0.2, 0})
+
+		att:SetField("NearPlane", 0.1);
+		-- att:SetField("FieldOfView", 60/180*3.1415926)
+
+		--att:SetField("MoveScaler", 5);
+		att:SetField("RotationScaler", 0.0025);
+		--att:SetField("TotalDragTime", 5)
+		--att:SetField("SmoothFramesNum", 8)
+
+		att:SetField("IsShiftMoveSwitched", true);
+		
+		att:SetField("EnableMouseWheel", false);
+		
+
+		ParaScene.GetPlayer():SetDensity(1);
+
+		if(CameraController.IsAlwaysRotateCameraWhenFPS) then
+			if(not System.options.IsMobilePlatform) then
+				CameraController.ToggleCursor(false, true);
+				local root_ = ParaUI.GetUIObject("root")
+				local _, _, width_screen, height_screen = root_:GetAbsPosition();
+				root_:GetAttributeObject():SetField("MousePosition", {width_screen / 2, height_screen / 2});
+				local _this = ParaUI.GetUIObject("FPS_Cursor");
+				if(not _this:IsValid())then
+					local _this = ParaUI.CreateUIObject("button", "FPS_Cursor", "_ct", 0, 0, 32, 32);
+					local cursor = GameLogic.options.fps_cursor;
+					_this.background = cursor.file;
+					_this.x = -cursor.hot_x;
+					_this.y = -cursor.hot_y;
+			
+					_this.enabled = false;
+					_guihelper.SetUIColor(_this, "#ffffffff");
+					_this:AttachToRoot();
+				end
+			
+				if( GameLogic.GameMode:IsMovieMode()) then
+					_this.visible = false;
+				else
+					_this.visible = true;
+				end
+			end
+		end
+		if(not System.options.IsMobilePlatform) then
+			CameraController.FPS_MouseTimer = CameraController.FPS_MouseTimer or commonlib.Timer:new({callbackFunc = CameraController.OnFPSMouseTimer})
+			CameraController.FPS_MouseTimer:Change(500,500);
+		end
+	elseif curMode == CameraModes.TopView then 
+		-- external camera view.
+		att:SetField("MaxCameraObjectDistance", 26);
+		att:SetField("IsAlwaysRotateCameraWhenFPS", false);
+		att:SetField("CameraObjectDistance", 10);
+		att:SetField("NearPlane", 0.1);
+		att:SetField("CameraLookatOffset",{0, 0, 0})
+
+		--att:SetField("FieldOfView", 60/180*3.1415926)
+
+		--att:SetField("MoveScaler", 5);
+		att:SetField("RotationScaler", 0.01);
+		--att:SetField("TotalDragTime", 0.5)
+		--att:SetField("SmoothFramesNum", 2)
+		att:SetField("EnableMouseWheel", false);
+
+		att:SetField("IsShiftMoveSwitched", true);
+		att:SetField("BlockInput",true);
+		att:SetField("CameraLiftupAngle", 1.4);
+		att:SetField("CameraRotY", 0);
+
+		
+		ParaScene.GetPlayer():SetDensity(GameLogic.options.NormalDensity);
+		CameraController.ToggleCursor(true, true);
+
+		local _this = ParaUI.GetUIObject("FPS_Cursor");
+		if(_this:IsValid())then
+			_this.visible = false;
+		end
+		if(CameraController.FPS_MouseTimer) then
+			CameraController.FPS_MouseTimer:Change();
+		end
 	else
 		-- external camera view.
+
+		att:SetField("BlockInput",false);
 		att:SetField("MaxCameraObjectDistance", 26);
 		att:SetField("IsAlwaysRotateCameraWhenFPS", false);
 		att:SetField("CameraObjectDistance", 8);
 		att:SetField("NearPlane", 0.1);
+		att:SetField("CameraLookatOffset",{0, 0, 0})
+
 		--att:SetField("FieldOfView", 60/180*3.1415926)
 
 		--att:SetField("MoveScaler", 5);
@@ -231,8 +324,8 @@ function CameraController.ToggleCamera(IsFPSView)
 
 		att:SetField("IsShiftMoveSwitched", true);
 		ParaScene.GetPlayer():SetDensity(GameLogic.options.NormalDensity);
-		ParaUI.ShowCursor(true);
-		ParaUI.LockMouse(false);
+		CameraController.ToggleCursor(true, true);
+
 		local _this = ParaUI.GetUIObject("FPS_Cursor");
 		if(_this:IsValid())then
 			_this.visible = false;
@@ -241,6 +334,26 @@ function CameraController.ToggleCamera(IsFPSView)
 			CameraController.FPS_MouseTimer:Change();
 		end
 	end
+end
+
+function CameraController.ToggleCursor(value, force)
+	local mode = CameraController.GetMode();
+	if not force and mode ~= CameraModes.ShootingGame and 
+		mode ~= CameraModes.FirstPerson  then 
+		return;
+	end
+		
+	if value == nil then
+		CameraController.cursorState = not CameraController.cursorState;
+	else
+		CameraController.cursorState = value
+	end
+
+	ParaUI.ShowCursor(CameraController.cursorState);
+	ParaUI.LockMouse(not CameraController.cursorState);
+
+	local att = ParaCamera.GetAttributeObject();
+	att:SetField("IsAlwaysRotateCameraWhenFPS", not CameraController.cursorState);
 end
 
 -- toggle with last fov and the given gov
@@ -253,6 +366,10 @@ function CameraController.ToggleFov(fov, speed_fov)
 		self.last_fov = cur_fov;
 		CameraController.AnimateFieldOfView(fov, speed_fov);
 	end
+end
+
+function CameraController.GetFov()
+	return CameraController.target_fov;
 end
 
 -- animate to a target field of view
@@ -381,7 +498,7 @@ function CameraController.UpdateViewBobbing()
 	end
 	
 	-- swing amplitude
-	if(GameLogic.options.ViewBobbing) then
+	if(GameLogic.options.ViewBobbing and CameraController.GetMode() ~= CameraModes.ShootingGame) then
 		local amp = speed * GameLogic.options.ViewBobbingAmpScale;
 
 		local att = ParaCamera.GetAttributeObject();
@@ -473,6 +590,7 @@ end
 
 -- same as render frame rate
 function CameraController.OnCameraFrameMove()
+  CameraController.mMessageSourceContainer:getMessageSource():notify(CameraController.EMessage.BeginOnCameraFrameMove);
 	-- update camera stats
 	camera.prevPosX, camera.prevPosY, camera.prevPosZ = camera.posX, camera.posY, camera.posZ;
 	camera.last_time = camera.cur_time;
@@ -500,11 +618,20 @@ function CameraController.OnCameraFrameMove()
 	CameraController.UpdateViewBobbing();
 
 	CameraController.UpdateFlyMode();
+	CameraController.UpdateFacing();
 end
+
+function CameraController.UpdateFacing()
+	local entity = EntityManager.GetFocus();
+	if entity and CameraController.GetMode() == CameraModes.ShootingGame then 
+		entity:SetFacing(ParaCamera.GetAttributeObject():GetField("CameraRotY"), entity:GetFacing())
+	end
+end
+
 
 function CameraController.UpdateFlyMode()
 	local entity = EntityManager.GetFocus();
-	if(entity and entity:IsFlying() and not entity:IsControlledExternally()) then
+	if(entity and ((entity:IsFlying()  and not entity:IsControlledExternally()) or CameraController.GetMode() == CameraModes.ShootingGame) ) then
 		ParaCamera.GetAttributeObject():SetField("UseRightButtonBipedFacing", true);
 	else
 		ParaCamera.GetAttributeObject():SetField("UseRightButtonBipedFacing", false);

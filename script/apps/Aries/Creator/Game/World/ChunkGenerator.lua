@@ -85,7 +85,7 @@ end
 local cur_generator = nil;
 
 function ChunkGenerator:ctor()
-	cur_generator = nil;
+	--cur_generator = nil;
 	self.pending_chunks = {}
 	self.forced_chunks = {};
 	self.last_pos = UniversalCoords:new();
@@ -120,7 +120,7 @@ function ChunkGenerator:AddPendingChunksFrom(chunkGenerator)
 		return
 	end
 	self.pending_chunks = chunkGenerator.pending_chunks;
-	chunkGenerator.pending_chunks = {};
+	--chunkGenerator.pending_chunks = {};
 	self.last_pos:Clone(chunkGenerator.last_pos);
 	self.cur_pos:Clone(chunkGenerator.cur_pos);
 
