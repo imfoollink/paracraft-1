@@ -44,6 +44,9 @@ Map3DSystem.App.MiniGames.SwfLoadingBarPage.ClosePage();
 NPL.load("(gl)script/ide/FlashPlayerWindow.lua");
 NPL.load("(gl)script/ide/FlashExternalInterface.lua");
 
+local ModuleManager = commonlib.gettable("Mod.Truck.Game.ModuleManager");
+local ltipsConfig = {}
+local CommonUtility = commonlib.gettable("Mod.Truck.Utility.CommonUtility");
 local LOG = LOG;
 -- default member attributes
 local SwfLoadingBarPage = commonlib.createtable("Map3DSystem.App.MiniGames.SwfLoadingBarPage", {
@@ -521,7 +524,77 @@ end
 	}
 --]]
 --function SwfLoadingBarPage.ShowPage(state,align,left,top,width,height, show_background)
+
+function SwfLoadingBarPage.InitTipsConfig()
+
+	ltipsConfig = {}
+	local config = commonlib.gettable("Mod.Truck.Config");
+
+	local function AddConfig(name, platform)
+		local list = {}
+		local datas = config.LoadingTipsConfig[name]
+		if datas then
+			local size = datas:size()
+			for i = 1,size do
+				table.insert(list,datas:get(i))
+			end
+		end
+		local datas = config.LoadingTipsConfig[name..platform]
+		if datas then
+			local size = datas:size()
+			for i = 1,size do
+				table.insert(list,datas:get(i))
+			end
+		end
+		ltipsConfig[name] = list
+	end
+	if CommonUtility:IsMobilePlatform() then
+		AddConfig("Common","_Mobile")
+		AddConfig("BigWorld","_Mobile")
+		AddConfig("GuideWorld","_Mobile")
+		AddConfig("Visit","_Mobile")
+		AddConfig("AloneEdit","_Mobile")
+		AddConfig("MultiPlayer","_Mobile")
+		AddConfig("MultiGame","_Mobile")
+	else
+		AddConfig("Common","_Pc")
+		AddConfig("BigWorld","_Pc")
+		AddConfig("GuideWorld","_Pc")
+		AddConfig("Visit","_Pc")
+		AddConfig("AloneEdit","_Pc")
+		AddConfig("MultiPlayer","_Pc")
+		AddConfig("MultiGame","_Pc")
+	end
+end
+function SwfLoadingBarPage.GetEnterWorldText()
+	local textName = "Common"
+	local randomNum = math.random(1,10)
+	if randomNum <= 8 then
+		if ModuleManager.checkModule("BigWorld") then
+		    textName = "BigWorld"
+		elseif ModuleManager.checkModule("GuideWorld") then
+		    textName = "GuideWorld"
+		elseif ModuleManager.checkModule("VisitWorld") then
+		    textName = "Visit"
+		elseif ModuleManager.checkModule("StandAlone") then
+		    textName = "AloneEdit"
+		elseif ModuleManager.checkModule("MultiPlayerMiniGame") then
+		    textName = "MultiGame"
+		elseif ModuleManager.checkModule("MultiPlayerEdit") then
+		    textName = "MultiPlayer"
+		end
+	end
+	local returnText = "正在加载星球，请稍等。。。"
+	local textList = ltipsConfig[textName]
+	if textList and #textList>0 then
+		returnText = textList[math.random(1,#textList)].text
+	end
+	return returnText
+end
 function SwfLoadingBarPage.ShowPage(msg)
+ 	math.randomseed(os.time())
+	SwfLoadingBarPage.InitTipsConfig()
+
 	local self = SwfLoadingBarPage;
 	local state = msg.state or self.state;
 	local align = msg.align or self.align;
@@ -562,7 +635,8 @@ function SwfLoadingBarPage.ShowPage(msg)
 			url = url.."&worldname="..worldname;
 		end
 	end
-	
+	echo("================url");
+	echo(url);
 	self.cur_alignment = align; -- not used
 	self.cur_block_style = format("margin-left:%dpx;margin-top:%dpx;width:%dpx;height:%dpx", left, top, width, height);
 

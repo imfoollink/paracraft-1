@@ -27,6 +27,11 @@ function Map3DSystem.OnNetworkEvent()
 		if(OnConnectionDisconnected) then
 			OnConnectionDisconnected(msg.nid, msg.msg);
 		end
+
+		local NetworkClient = commonlib.gettable("Mod.Truck.Network.NetworkClient");
+		if NetworkClient and NetworkClient.handleError then 
+			NetworkClient.handleError(msg.nid, msg.msg)
+		end
 	elseif(msg.code == NPLReturnCode.NPL_Command) then
 		LOG.std("", "system", "event", "network cmd from %s", msg.nid);
 		echo(msg);

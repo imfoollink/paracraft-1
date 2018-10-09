@@ -468,6 +468,31 @@ function Map3DSystem_OnKeyDownEvent()
 	end
 end
 
+function Map3DSystem_OnKeyUpEvent()
+	-- apply key filter
+	if(key_pass_filter and not key_pass_filter[virtual_key]) then
+		return;
+	end
+
+	-- update input message
+	local input = Map3DSystem.InputMsg;
+
+	local event_map = Event_Mapping;
+	input.virtual_key = virtual_key;
+	input.IsComboKeyPressed = (ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_LCONTROL) or ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_LSHIFT) or ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_LMENU) or 
+				ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_RCONTROL) or ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_RSHIFT) or ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_RMENU))
+		 and 
+		-- single virtual_key down response for EM_KEY_LCONTROL and EM_KEY_LSHIFT
+		-- e.g. BCS Xref activation and avatar prosession operation
+		(virtual_key ~= event_map.EM_KEY_LCONTROL) and (virtual_key ~= event_map.EM_KEY_LSHIFT);
+	input.wndName = "key_up";
+	input.IsSceneEnabled = ParaScene.IsSceneEnabled()
+	-- call hook for "input" application
+	if(CommonCtrl.os.hook.Invoke(CommonCtrl.os.hook.HookType.WH_CALLWNDPROC, 0, "input", input) ==nil) then
+		return
+	end
+end
+
 -- when esc key is clicked. 
 function Map3DSystem.OnEscKey()
 	-- TODO
