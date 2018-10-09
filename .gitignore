@@ -83,3 +83,6 @@ test*.*
 test/
 _obsoleted/
 obsoleted/
+
+# added in truck
+.DS_Store
