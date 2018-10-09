@@ -18,6 +18,7 @@ local MainLogin = commonlib.gettable("MyCompany.Aries.Game.MainLogin");
 
 function MainLogin:start(init_callback)
 
+    echo("cellfy", "----------------------------------main login start----------------------------------");
 	--set title
 	ParaEngine.SetWindowText(string.format("创意空间"));
 	
@@ -130,7 +131,10 @@ end
 
 function MainLogin:ShowLoginBackgroundPage(bShow, bShowCopyRight, bShowLogo, bShowBg)
 
-	local url = "script/apps/Aries/Creator/Game/Login/LoginBackgroundPage.html"
+	echo("cellfy", "----------------------------------main login show bg----------------------------------");
+
+	--to be dealt with later
+	local url = "script/apps/Aries/Creator/Game/Login/LoginBackgroundPageVoid.html"
 	System.App.Commands.Call("File.MCMLWindowFrame", {
 		url = url, 
 		name = "LoginBGPage", 
