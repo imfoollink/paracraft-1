@@ -1,0 +1,55 @@
+﻿<!-- "script/apps/Aries/BBSChat/ChatSystem/SmileyPage.teen.html" -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" >
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title></title>
+</head>
+<body>
+<pe:mcml>
+<script type="text/npl" src="SmileyPage.lua"><![CDATA[
+
+
+    local UIManager = commonlib.gettable("Mod.Truck.Game.UI.UIManager");
+    ui = UIManager.bind("SmileyPage", Page);
+    
+    function DS_Func_Items(index)
+        return ui:DS_Func_Items(index);
+    end
+    function ClosePage()
+        ui:close()
+    end
+
+    function OnClickIcon(index)
+        ui:DoClick(index);
+    end
+
+]]></script>
+
+<div style="texpack:addr_by_id(ESCFrameUI->9.png);width:270px;height:200px;" class="window">
+    <div style="height:19px;margin-left:10px;margin-top:15px;">
+      <div class="windowlabel">表情</div>
+      <input type="button" onclick="ClosePage()" class="closebutton" style="position:relative;margin-top:-10px;margin-left:205px;texpack:addr_by_id(Common->close.png);width:40px;height:40px;" />
+    </div>
+    <div style="margin-left:10px;margin-top:5px;height:140px;width:250px;">
+    <pe:gridview DataSource="<%=DS_Func_Items%>" name="DS_Func_Items" 
+        VerticalScrollBarStep="45" CellPadding="2"  DefaultNodeHeight = "45" ItemsPerLine="5" AllowPaging="false" pagesize="250">
+        <Columns>
+            <a width="44" height="50" tooltip='<%=Eval("tipname")%>' style="padding:0px;background:Texture/Aries/Dock/Action_MouseOver_32bits.png:7 7 7 7;"
+                onclick="OnClickIcon" param1='<%=Eval("index")%>'>
+                <div style="margin:1px;padding-left:2px;width:42px;height:42px;" class="block">
+                    <img width="43" height="37" src='<%=Eval("icon")%>'/>
+                </div>
+            </a>
+        </Columns>
+        <EmptyDataTemplate>
+        </EmptyDataTemplate>
+        <FetchingDataTemplate>
+        </FetchingDataTemplate>
+    </pe:gridview>
+    </div>
+</div>
+
+</pe:mcml> 
+</body>
+</html>

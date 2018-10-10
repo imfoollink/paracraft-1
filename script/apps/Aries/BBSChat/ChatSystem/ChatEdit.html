@@ -1,0 +1,46 @@
+﻿<!-- "script/apps/Aries/BBSChat/ChatSystem/ChatEdit.html" -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" >
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>ChatEdit, by lixizhi, 2011/3/14</title>
+</head>
+<body>
+<pe:mcml>
+<script type="text/npl" ><![CDATA[
+NPL.load("(gl)script/apps/Aries/BBSChat/ChatSystem/ChatEdit.lua");
+local page = document:GetPageCtrl();
+MyCompany.Aries.ChatSystem.ChatEdit.Init();
+
+function OnQuickword(sName)
+    local btn = page:FindUIControl(sName);
+    if(btn and btn:IsValid())then
+        local name = btn.name;
+        local x,y,width, height = btn:GetAbsPosition();
+        NPL.load("(gl)script/apps/Aries/BBSChat/ChatSystem/BattleQuickWord.lua");
+        MyCompany.Aries.ChatSystem.BattleQuickWord.OnQuickword(x,y,width, height);
+    end
+end
+function OnClickSmiley()
+    MyCompany.Aries.Desktop.Dock.OnClickSmiley();
+end
+]]></script>
+<div width="100%" style="height:24px;background-color:#ffffff80;background:url(Texture/Aries/ChatSystem/bg3_32bits.png:6 6 6 6);">
+    <div style="float:left;margin-left:1px;">
+        <input type="button" tooltip='<%=TL"快捷语言"%>' style="font-size:12px;margin-top:2px;width:20px;height:20px;background:url(Texture/Aries/Dock/Web/Quickword_32bits.png);" 
+            onclick="OnQuickword()" name="quickword_btn"/>
+        <input type="button" tooltip='<%=TL"表情"%>' style="font-size:12px;margin-top:2px;width:20px;height:20px;background:url(Texture/Aries/Dock/Web/Smiley_32bits.png);" 
+            onclick="OnClickSmiley()" name="onsmiley_btn"/>
+    </div>
+    <div width="100%" style="float:left;margin-top:2px;margin-left:0px;margin-right:22px;height:20px;background:url(Texture/Aries/ChatSystem/kids/chatbox_bg_32bits.png: 6 6 6 6);">
+        <input type="text" name="chatedit_words" onkeyup="MyCompany.Aries.ChatSystem.ChatEdit.OnKeyUp" textcolor="#000000" width="100%" style="position:relative;margin-top:-2px;height:22px;background:;" class="bordertext"/>
+    </div>
+    <div style="position:relative;float:left;margin-left:-22px;">
+        <input type="button" style="font-size:12px;margin-top:2px;width:20px;height:20px;background:url(Texture/Aries/Dock/Web/channel_say_32bits.png#0 0 29 29);" 
+            name="send" tooltip='<%=TL"发送"%>' onclick="MyCompany.Aries.ChatSystem.ChatEdit.OnClickSend"/>    
+    </div>
+</div>
+
+</pe:mcml> 
+</body>
+</html>

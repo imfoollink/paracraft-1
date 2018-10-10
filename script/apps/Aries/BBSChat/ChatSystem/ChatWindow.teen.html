@@ -1,0 +1,77 @@
+﻿<!-- "script/apps/Aries/BBSChat/ChatSystem/ChatWindow.teen.html" -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" >
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>ChatWndow, 2011/3/9</title>
+</head>
+<body>
+<pe:mcml>
+<script type="text/npl" ><![CDATA[
+local page = document:GetPageCtrl();
+MyCompany.Aries.ChatSystem.ChatWindow.Init();
+
+function OnSwitchChannelDisplay(name, tabitem_mcmlNode)
+    if(false) then
+        -- Click to change display
+        MyCompany.Aries.ChatSystem.ChatWindow.OnSwitchChannelDisplay(name);
+    else
+        -- Click to change input
+        MyCompany.Aries.ChatSystem.ChatWindow.OnSwitchChannelDisplay(name);
+        if(name == "0") then
+            name = "1"; -- click 0 channels will write to all.
+        end
+        MyCompany.Aries.ChatSystem.ChatEdit.OnClickChannel(name, tabitem_mcmlNode:GetAttribute("text"));
+    end
+end
+]]></script>
+<div>
+    <div width="100%" style="height:49px;">
+        <div style="position:relative;width:420px;">
+            <pe:custom id="1" oncreate="MyCompany.Aries.ChatSystem.ChatWindow.CreateBroadTreeView" style="margin-left:16px;height:47px;" />
+        </div>
+    </div>
+    <pe:container name="canvas" ClickThrough="true" style="position:relative;margin:0px;padding:0px;background:" zorder="-1">
+        <div width="100%" height="100%" style="margin-top:0px;margin-bottom:24px;background-color:#ffffffff;background:url(Texture/Aries/Common/Teen/chat/bg_32bits.png:10 10 4 4);">
+            <div style="margin-top:0px;">
+                <pe:custom oncreate="MyCompany.Aries.ChatSystem.ChatWindow.CreateDragger()" style="width:16px;height:16px;background:url(Texture/Aries/Common/Teen/chat/move_32bits.png);" />
+            </div>
+            <div style="margin-top:-1px;margin-bottom:16px;" height="100%">
+                <pe:custom oncreate="MyCompany.Aries.ChatSystem.ChatWindow.CreateTreeViewScrollBar()" style="width:16px;" />
+            </div>
+            <div style="margin-top:-16px;">
+                <input type="button" tooltip='<%=TL"切换窗口大小"%>' onclick="MyCompany.Aries.ChatSystem.ChatWindow.ToggleChatWindowSize()" style="width:16px;height:16px;margin-top:0px;background:url(Texture/Aries/Common/Teen/chat/resizer_32bits.png);" />
+            </div>
+        </div>
+        <div style="margin-top:-23px;">
+            <div style="position:relative;margin-left:0px;margin-top:0px;">
+                <input type="button" name="minimize" tooltip='<%=TL"最小化聊天窗口"%>' onclick="MyCompany.Aries.ChatSystem.ChatWindow.OnClickWndMinimize" style="width:16px;height:20px;background:url(Texture/Aries/Common/Teen/chat/close_32bits.png#0 0 16 20);" />    
+            </div>
+            <div style="margin-left:7px;margin-top:0px;">
+                <pe:tabs name="tabChannel" onclick="OnSwitchChannelDisplay" 
+                    SelectedMenuItemBG="Texture/Aries/ChatSystem/tab_hl_32bits.png;0 0 42 20: 10 10 10 10" UnSelectedMenuItemBG="Texture/Aries/ChatSystem/tab_32bits.png;0 0 42 20: 10 10 10 10" 
+                    style="height:20px;background:;padding-top:37px;padding-left:10px;" TextOffsetY="-2" TextShadowQuality="8" TextShadowColor="#2a2a2e27" TextColor="#f0f0f0" SelectedTextColor="#f0f0f0" ItemSpacing="0" TextFont="System;12;norm" >
+                    <!--综合-->
+                    <pe:tab-item name="0" text='<%=TL"综合"%>' tooltip='<%=TL"综合"%>' selected="true" style="width:42px" height="20" />
+                    <!--队伍-->
+                    <pe:tab-item name="2" text='<%=TL"队伍"%>' tooltip='<%=TL"队伍"%>' style="width:42px" height="20" />
+                    <!--单聊-->
+                    <pe:tab-item name="3" text='<%=TL"单聊"%>' tooltip='<%=TL"单聊"%>' style="width:42px" height="20" />
+                    <!--家族-->
+                    <pe:tab-item name="4" text='<%=TL"家族"%>' tooltip='<%=TL"家族"%>' style="width:42px" height="20" />
+                    <!--<pe:tab-item name="5" text='<%=TL"团"%>' tooltip='<%=TL"团"%>' style="width:42px" height="20"/>-->
+                    <pe:tab-item name="6" text='<%=TL"全服"%>' tooltip='<%=TL"全服"%>' style="width:42px"  height="20"/>
+                    <!--<pe:tab-item name="7" text='<%=TL"组"%>' tooltip='<%=TL"组"%>' style="width:42px" height="20"/>-->
+                    <!--喇叭-->
+                    <pe:tab-item name="10" text='<%=TL"全区"%>' tooltip='<%=TL"全区"%>' style="width:42px" height="20" />
+                </pe:tabs>
+            </div>
+        </div>
+    </pe:container>
+    <div style="margin-top:2px;margin-bottom:24px;" width="100%" height="100%">
+        <pe:custom oncreate="MyCompany.Aries.ChatSystem.ChatWindow.CreateTreeView()" style="margin-left:16px;" />
+    </div>
+</div>
+</pe:mcml> 
+</body>
+</html>
