@@ -527,8 +527,6 @@ end
 -- load from the current world directory. 
 function GameLogic.LoadGame()
     NPL.load("(gl)script/Truck/SystemSettingsPage.lua");
-    local SystemSettingsPage = commonlib.gettable("Mod.Truck.UI.SystemSettingsPage");
-    SystemSettingsPage.ChangeSkyBox();
 
     GameLogic.current_worlddir = ParaWorld.GetWorldDirectory();
     -- GameLogic.script_dir = GameLogic.current_worlddir.."script/blocks/";
@@ -573,6 +571,8 @@ function GameLogic.LoadGame()
     ModManager:OnWorldLoad();
     GameLogic:WorldLoaded();
     
+    local SystemSettingsPage = commonlib.gettable("Mod.Truck.UI.SystemSettingsPage");
+    SystemSettingsPage.ChangeSkyBox();
     SystemSettingsPage.setting_ds["render_dist"]=MyCompany.Aries.Player.LoadLocalData("Paracraft_System_Render_Distance",150,true);
     options:SetRenderDist(SystemSettingsPage.setting_ds["render_dist"]);
     ParaTerrain.GetBlockAttributeObject():SetField("UseWaterReflection",SystemSettingsPage.setting_ds["water_reflection"]);
