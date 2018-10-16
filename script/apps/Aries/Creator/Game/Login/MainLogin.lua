@@ -20,7 +20,7 @@ function MainLogin:start(init_callback)
 
     echo("cellfy", "----------------------------------main login start----------------------------------");
 	--set title
-	ParaEngine.SetWindowText(string.format("创意空间"));
+	ParaEngine.SetWindowText(string.format("哈奇小镇"));
 	
 
 	NPL.load("(gl)script/apps/Aries/Creator/Game/mcml/pe_mc_mcml.lua");
