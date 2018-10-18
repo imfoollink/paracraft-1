@@ -36,7 +36,7 @@ function MainLogin:start(init_callback)
     local GameLogic = commonlib.gettable("MyCompany.Aries.Game.GameLogic")
 	GameLogic.InitMod();
 
-	self:checkInstallUrlProtocol();
+	-- self:checkInstallUrlProtocol();
 	self:CheckCommandLine();
 	
 	--self:LoadLoginPage()
