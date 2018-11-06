@@ -81,9 +81,9 @@ function CodeGlobals:ctor()
 			local result = SelectionManager:MousePickBlock(true, false, false, picking_dist);
 			return result.blockX, result.blockY, result.blockZ, result.block_id, result.side;
 		end,
-		-- get block id at given position
+		-- get block id and data at given position
 		getBlock = function(x,y,z)
-			return BlockEngine:GetBlockId(math.floor(x), math.floor(y), math.floor(z));
+			return BlockEngine:GetBlockIdAndData(math.floor(x), math.floor(y), math.floor(z));
 		end,
 		-- set block id at given position
 		setBlock = function(x,y,z, blockId, blockData)
@@ -98,6 +98,7 @@ end
 function CodeGlobals:Reset()
 	local curGlobals = {};
 	self.curGlobals = curGlobals;
+	self.cur_co = nil;
 
 	-- look in global table first, and then in shared API. 
 	local meta_table = {__index = function(tab, name)
@@ -106,6 +107,10 @@ function CodeGlobals:Reset()
 			if(info) then
 				return info.currentline;
 			end
+		elseif(name == "co") then
+			return self.cur_co;
+		elseif(name == "actor") then
+			return self.cur_co and self.cur_co:GetActor();
 		end
 		local value = curGlobals[name];
 		if(value==nil) then
@@ -124,6 +129,10 @@ function CodeGlobals:Reset()
 
 	-- clear UI if any
 	CodeUI:Clear();
+end
+
+function CodeGlobals:SetCurrentCoroutine(co)
+	self.cur_co = co;
 end
 
 function CodeGlobals:AddCodeBlock(codeblock)
@@ -216,15 +225,21 @@ end
 function CodeGlobals:HandleGameEvent(event)
 	local textEvent = self:GetTextEvent(event:GetType());
 	if(textEvent) then
-		if(not event.msg) then
+		local msg = event.msg;
+		if(not msg) then
 			local trigger_entity = EntityManager.GetLastTriggerEntity();
 			if(trigger_entity) then
 				-- if no message body is provided, we will send the triggering entity name
 				-- this is useful to get the source entity's name, such as a network player
-				event.msg = trigger_entity:GetName();
+				msg = trigger_entity:GetName();
 			end
 		end
-		textEvent:DispatchEvent({type="msg", msg = event.msg,});
+		
+		if(event.cmd_text and event.cmd_text~="") then
+			msg = event.cmd_text;
+		end
+
+		textEvent:DispatchEvent({type="msg", msg = msg,});
 	end
 end
 

@@ -2,19 +2,20 @@
 Title: Entity Animation Model Generator
 Author(s): Cheng Yuanchu, LiXizhi
 Date: 2018/9/10
-Desc: When this block is placed next to a group of connected color blocks, we will convert the blocks into an animated model
+Desc: When this block is placed next to a group of connected blocks, we will convert the blocks into an animated model.
+we will extract all connected color blocks, but only extract ordinary solid blocks that is higher than current block
 use the lib:
 ------------------------------------------------------------
 NPL.load("(gl)script/apps/Aries/Creator/Game/Entity/EntityAnimModel.lua");
 local EntityAnimModel = commonlib.gettable("MyCompany.Aries.Game.EntityManager.EntityAnimModel")
 -------------------------------------------------------
 ]]
-NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeBlock.lua");
 NPL.load("(gl)Mod/ParaXExporter/BMaxModel.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/SelectBlocksTask.lua");
-NPL.load("(gl)script/ide/Files.lua");
-
-local CodeBlock = commonlib.gettable("MyCompany.Aries.Game.Code.CodeBlock");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Entity/ModelTemplatesFile.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Common/Files.lua");
+local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
+local ModelTemplatesFile = commonlib.gettable("MyCompany.Aries.Game.EntityManager.ModelTemplatesFile")
 local Direction = commonlib.gettable("MyCompany.Aries.Game.Common.Direction");
 local BlockEngine = commonlib.gettable("MyCompany.Aries.Game.BlockEngine");
 local block_types = commonlib.gettable("MyCompany.Aries.Game.block_types");
@@ -32,6 +33,7 @@ EntityManager.RegisterEntityClass(Entity.class_name, Entity);
 Entity.is_persistent = true;
 -- always serialize to 512*512 regional entity file
 Entity.is_regional = true;
+Entity.thinkTickInterval = 1000;
 
 -- we will only allow this number of connected code block to share the same movie entity
 local maxConnectedCodeBlockCount = 255;
@@ -42,6 +44,10 @@ end
 function Entity:OnRemoved()
 	Entity._super.OnRemoved(self);
 	self:DeleteOutputCharacter();
+	self:DeleteThinkerEntity();
+	if(self:IsBuilding())then
+		self:SetBuilding(false);
+	end
 end
 
 function Entity:OnNeighborChanged(x,y,z, from_block_id)
@@ -52,13 +58,14 @@ end
 
 function Entity:SaveToXMLNode(node, bSort)
 	node = Entity._super.SaveToXMLNode(self, node, bSort);
-	node.attr.filename = self.filename;
+	if(self.filename and self.filename~="") then
+		node.attr.filename = self.filename;
+	end
 	return node;
 end
 
 function Entity:LoadFromXMLNode(node)
 	Entity._super.LoadFromXMLNode(self, node);
-	self:SetAllowGameModeEdit(node.attr.allowGameModeEdit == "true");
 	self.filename = node.attr.filename;
 end
 
@@ -83,7 +90,23 @@ function Entity:OnClick(x, y, z, mouse_button, entity, side)
 end
 
 function Entity:OpenEditor(editor_name, entity)
-	self:TryRebuild();
+	if(Files.FileExists(self:GetFilename())) then
+		self:CreateOutputCharacter();
+		local charEntity = self:GetOutputCharacter();
+		if(charEntity) then
+			local filename = self:GetFilename();
+			local result = Files.ResolveFilePath(filename);
+			filename = commonlib.Encoding.DefaultToUtf8(result.relativeToWorldPath or filename);
+			charEntity:Say(filename, nil, true);
+		end
+		_guihelper.MessageBox(format(L"是否重新生成 %s?", commonlib.Encoding.DefaultToUtf8(self:GetFilename())), function(res)
+			if(res and res == _guihelper.DialogResult.Yes) then
+				self:TryRebuild();
+			end
+		end, _guihelper.MessageBoxButtons.YesNo);
+	else
+		self:TryRebuild();
+	end
 end
 
 -- Ticks the block if it's been scheduled
@@ -112,7 +135,6 @@ function Entity:GetTempOutputFilename()
 	return self.outputFilename;
 end
 
-
 -- by default each entity has a unique name according to its position
 function Entity:GetFilename()
 	if(self.filename == "") then
@@ -129,6 +151,11 @@ end
 -- set user defined filename
 function Entity:SetFilename(filename)
 	self.filename = filename;
+	local entity = self:GetOutputCharacter();
+	if(entity) then
+		filename = Files.GetWorldFilePath(filename);
+		entity:SetMainAssetPath(filename);
+	end
 end
 
 function Entity:IsBuilding()
@@ -136,7 +163,15 @@ function Entity:IsBuilding()
 end
 
 function Entity:SetBuilding(bBuilding)
-	Entity.isBuilding = bBuilding;
+	if(Entity.isBuilding ~= bBuilding) then
+		if(not bBuilding) then
+			GameLogic.AddBBS("AnimModel", nil);
+		end
+		Entity.isBuilding = bBuilding;
+		if(Entity.isBuilding) then
+			self.startTime = commonlib.TimerManager.GetCurrentTime();
+		end
+	end
 end
 
 -- since there can be only one thread that is building, we will ignore concurrent calls.
@@ -146,27 +181,22 @@ function Entity:TryRebuild()
 	end
 end
 
--- static function:
+-- static function: this is mostly a singleton object
 -- get and initialize the auto rigger in C++ game engine for model generation
 function Entity:CreateGetAutoRigger()
 	-- matching and rigging
-	if(not Entity.autoAigger or not Entity.autoAigger:IsValid()) then
-		local autoRigger = ParaScene.CreateObject("CAutoRigger", "CAutoRigger",0,0,0);
-		self.autoRigger = autoRigger;
-		-- get templates model file(s) name list
-		NPL.load("(gl)script/apps/Aries/Creator/Game/Entity/ModelTemplatesFile.lua");
-		local ModelTemplatesFile = commonlib.gettable("MyCompany.Aries.Game.EntityManager.ModelTemplatesFile")
-		ModelTemplatesFile:Init();
+	if(not Entity.autoRigger or not Entity.autoRigger:IsValid()) then
+		local autoRigger = ParaScene.CreateObject("CAutoRigger", "MyAutoRigger",0,0,0);
+		ParaScene.Attach(autoRigger);
+		Entity.autoRigger = autoRigger;
+		-- add template models to the AutoRigger if not added yet
 		local models = ModelTemplatesFile:GetTemplates() or {};
-		if( next(models) ~= nil) then
-			-- add template models to the AutoRigger if not added yet
-			for i = 1, #models do
-				autoRigger:SetField("AddModelTemplate", models[i]);
-			end
+		for _, template in ipairs(ModelTemplatesFile:GetTemplates()) do
+			autoRigger:SetField("AddModelTemplate", template.filename);
 		end
 		LOG.std(nil, "info", "AnimModel", "a new auto rigger created and initialized with %d models", #models);
 	end
-	return self.autoRigger;
+	return Entity.autoRigger;
 end
 
 function Entity:LoadAsset(callback)
@@ -175,9 +205,10 @@ end
 
 -- rebuild all connected blocks into a model
 function Entity:Rebuild()
-	local blocks = self:SelectAllConnectedColorBlocks();
+	local blocks = self:GetAllConnectedColorBlocks();
 	if(blocks and #blocks == 0) then
 		GameLogic.AddBBS("AnimModel", L"需要放在一组彩色方块的旁边才能生成模型", 20);
+		self:ShowThinkerText(L"我的附近没有发现像模型的彩色方块")
 		return;
 	end
 	self:AutoOrientBlocks(blocks);
@@ -208,85 +239,174 @@ function Entity:Rebuild()
 		autoRigger:SetField("AutoRigModel", "");
 		self:SetBuilding(true);
 		GameLogic.AddBBS("AnimModel", format(L"正在为%d个方块生产动画模型，可能需要10-20秒, 请耐心等待", #blocks), 20000);
-
+		self:ShowThinkerText(L"我在思考中,需要10-20秒");
+		self:TickThinking();
 		return true;
 	end
 end
 
--- auto rotate blocks around y axis so that the model is facing positive x 
-function Entity:AutoOrientBlocks(blocks)
-	-- rotate the blocks
+function Entity:GetElapsedTime()
+	return commonlib.TimerManager.GetCurrentTime() - self:GetBuildStartTime();
+end
+
+function Entity:GetBuildStartTime()
+	return self.startTime or commonlib.TimerManager.GetCurrentTime();
+end
+
+function Entity:TickThinking()
+	if(self:IsBuilding()) then
+		self:ShowThinkerText(format(L"我在思考中: %d秒", math.floor(self:GetElapsedTime()/1000)));
+		commonlib.TimerManager.SetTimeout(function()  
+			if(self:IsBuilding()) then
+				self:ShowNextThinkerModel()
+				self:TickThinking();
+			end
+		end, self.thinkTickInterval)
+	end
+end
+
+-- we will get nearby color block to compute the model facing
+--@return {0, angleY, 0} of vector3d
+function Entity:ComputeModelFacing()
 	local x0,y0,z0 = self:GetBlockPos();
 	local x1,y1,z1;
+	local angle;
 	for side=0,5 do
 		local dx, dy, dz = Direction.GetOffsetBySide(side);
 		local x, y, z = x0+dx, y0+dy, z0+dz;
 		local block_id = ParaTerrain.GetBlockTemplateByIdx(x,y,z);
 		local block_data = ParaTerrain.GetBlockUserDataByIdx(x,y,z);
-		if( y >= y0 and block_id == 10 ) then
+		if( block_id~=0 and y >= y0) then
 			x1 = x;
 			y1 = y;
 			z1 = z;
+			angle = Direction.directionTo3DFacing[side]
 			break;
 		end
 	end
-	
+	angle = angle or 0;
+	local angles = vector3d:new(0, angle, 0);
+	return angles;
+end
+
+function Entity:OffsetBlocks(blocks, dx, dy, dz)
+	for i,block in ipairs(blocks) do
+		block[1] = block[1] + dx;
+		block[2] = block[2] + dy;
+		block[3] = block[3] + dz;
+	end
+end
+
+function Entity:CenterBlocks(blocks)
 	local aabb = ShapeAABB:new();
 	for i,block in ipairs(blocks) do
 		aabb:Extend(block[1], block[2], block[3]);
 	end
 	local center = aabb:GetCenter();
-	for i,block in ipairs(blocks) do
-		block[1] = block[1] - center[1];
-		block[2] = block[2] - center[2];
-		block[3] = block[3] - center[3];
-	end
+	--local cx,cy,cz = math.floor(center[1]+0.5), math.floor(center[2]+0.5), math.floor(center[3]+0.5)
+	local cx,cy,cz = center[1], center[2], center[3]
+	self:OffsetBlocks(blocks, -cx, -cy, -cz)
+end
 
-	local dir = vector3d:new({x0-x1,y0-y1,z0-z1});
-	dir:normalize();
-	local x_positive = vector3d:new(1,0,0);
-	local angle = dir:angleAbsolute(x_positive);
-	local around_y_axis = false;
-	if( math.abs(dir:dot(vector3d:new(0,1,0))) < 0.00001 ) then
-		around_y_axis = true;
-	end
-	
-	local angles;
-	if(around_y_axis) then
-		angles = {0, angle, 0};
-	else
-		angles = {0, 0, angle};
-	end
+function Entity:RotateBlocksByYAxis(blocks, rot_angle)
+	if(rot_angle~=0) then
+		local sin_t, cos_t = math.sin(rot_angle), math.cos(rot_angle);
+		-- snap to right angle
+		sin_t, cos_t = math.floor(sin_t+0.5), math.floor(cos_t+0.5);
 
-	--LOG.std(nil, "info", "Morph", "angle: %f!", angle);
+		local p = vector3d:new();
+		for _, block in ipairs(blocks) do
+			p:set(block[1], block[2], block[3]);
+			-- p:rotate(angles[1],angles[2],angles[3]);
+			p[1] = block[1]*cos_t - block[3]*sin_t
+			p[3] = block[1]*sin_t + block[3]*cos_t
 
-	for i,block in ipairs(blocks) do
-		local p = vector3d:new({block[1], block[2], block[3]});
-		p:rotate(angles[1],angles[2],angles[3]);
-		block[1] = p[1];
-		block[2] = p[2];
-		block[3] = p[3];
+			block[1] = p[1];
+			block[2] = p[2];
+			block[3] = p[3];
+		end
 	end
+end
 
+-- auto rotate blocks around y axis so that the model is facing positive x 
+-- also offset around the center
+function Entity:AutoOrientBlocks(blocks)
+	local x0,y0,z0 = self:GetBlockPos();
+	self:OffsetBlocks(blocks, -x0, -y0, -z0);
+
+	-- need to align to positive X axis
+	local angles = self:ComputeModelFacing();
+	self:RotateBlocksByYAxis(blocks, angles[2]);
+
+	-- center blocks, block pos be 0.5, not standard blocks
+	self:CenterBlocks(blocks);
 end
 
 -- static script callback function
 function Entity.OnAddRiggedFile_s(entityId)
 	local entity = EntityManager.GetEntityById(entityId)
 	if(entity) then
-		entity:OnAddRiggedFile();
+		entity:OnAddRiggedFile(msg.count, msg.filenames, msg.msg);
 	end
 end
 
-function Entity:OnAddRiggedFile()
+-- @param count: number of output, could be 0 or 1. if 0, msg is error message. 
+-- @param filenames: output filenames separated by ;
+-- @param msg: error message or the template's model filename
+function Entity:OnAddRiggedFile(count, filenames, msg)
 	self:SetBuilding(false);
-	if(ParaIO.CopyFile(self:GetTempOutputFilename(), self:GetFilename(), true)) then
-		GameLogic.AddBBS("AnimModel", format(L"人物模型已经保存到%s", self:GetFilename()));
-		LOG.std(nil, "info", "Morph", "auto rigged file generated to %s", self:GetFilename());
-		self:CreateOutputCharacter();
+	LOG.std(nil, "info", "AutoAnim", "Auto Rigging done: Count:%d filenames:%s msg: %s" , count or 0, filenames or "", msg or "");
+	if(count>0) then
+		local outputFile = Files.GetWorldFilePath(self:GetFilename()) or self:GetFilename();
+		if(ParaIO.CopyFile(self:GetTempOutputFilename(), outputFile, true)) then
+			LOG.std(nil, "info", "Morph", "auto rigged file generated to %s", commonlib.Encoding.DefaultToUtf8(outputFile));
+
+			local modelTemplateFilename = msg;
+			-- show what it looks like 
+			local displayName = self:GetTemplateModelNameByFilename(modelTemplateFilename)
+			if(displayName) then
+				GameLogic.AddBBS(nil, format(L"它看起来有点像 %s", displayName));
+				self:ShowThinkerText(format(L"它看起来有点像 %s", displayName));
+				self:SetThinkerModel(modelTemplateFilename);
+			else
+				self:ShowThinkerText(nil);
+			end
+
+			-- show saved world path
+			local result = Files.ResolveFilePath(self:GetFilename());
+			GameLogic.AddBBS("AnimModel", format(L"人物模型已经保存到%s", commonlib.Encoding.DefaultToUtf8(result.relativeToWorldPath) or ""));
+
+			-- create temporary character for further interaction
+			self:CreateOutputCharacter();
+			local entity = self:GetOutputCharacter();
+			if(entity) then
+				entity:Say(L"点击我", 10, true);
+				local x, y, z = EntityManager.GetPlayer():GetPosition()
+				entity:SetPosition(x, y, z);
+			end
+			
+			local Event = commonlib.gettable("System.Core.Event");
+			local event = Event:new():init("SaveAnimModel");
+			event.cmd_text = {name = self:GetFilename()};
+			GameLogic:event(event);			
+		else
+			GameLogic.AddBBS("AnimModel", format(L"无法覆盖文件%s", commonlib.Encoding.DefaultToUtf8(self:GetFilename())));
+			self:ShowThinkerText(L"出错了");
+		end
 	else
-		GameLogic.AddBBS("AnimModel", format(L"无法覆盖文件%s", self:GetFilename()));
+		GameLogic.AddBBS("AnimModel", L"没有找到匹配的模型");
+		self:ShowThinkerText(L"没有找到匹配的模型");
 	end
+end
+
+-- return display name or nil
+function Entity:GetTemplateModelNameByFilename(filename)
+	local template = ModelTemplatesFile:GetTemplateByFilename(filename);
+	return template and template.name;
+end
+
+function Entity:GetOutputCharacter()
+	return self.outputEntity;
 end
 
 function Entity:CreateOutputCharacter()
@@ -295,11 +415,11 @@ function Entity:CreateOutputCharacter()
 		return;
 	end
 	local x, y, z = EntityManager.GetPlayer():GetPosition()
-	local entity = EntityManager.EntityNPC:Create({x=x,y=y,z=z, item_id = block_types.names.TimeSeriesNPC});
-	entity:SetMainAssetPath(self:GetFilename());
-	entity:SetPersistent(false);
-	entity:SetCanRandomMove(false);
-	entity:SetDummy(true);
+	local entity = EntityManager.EntityAnimCharacter:Create({x=x,y=y,z=z, item_id = block_types.names.TimeSeriesNPC});
+	
+	entity:SetMainAssetPath(Files.GetWorldFilePath(self:GetFilename()));
+	entity:SetFacing(self:ComputeModelFacing()[2]);
+	entity:SetAnimModelEntity(self);
 	entity:Attach();
 	self.outputEntity = entity;
 end
@@ -311,14 +431,16 @@ function Entity:DeleteOutputCharacter()
 	end
 end
 
-
-function Entity:SelectAllConnectedColorBlocks()
+-- it will return all connected color blocks or any connected solid blocks higher than the anim block.
+function Entity:GetAllConnectedColorBlocks()
 	local x0,y0,z0 = self:GetBlockPos();
 	local num_selected = 0;
-	local max_selected = 65535;
+	local max_selected = 1000; -- 65535
 	local blocks = {};
 	local block_indices = {};
 	local block_queue = commonlib.Queue:new();
+	local colorItem = block_types.get(block_types.names.ColorBlock):GetItem();
+
 	local function AddConnectedBlockRecursive(cx,cy,cz)
 		if( num_selected <= max_selected ) then
 			for side=0,5 do
@@ -327,22 +449,90 @@ function Entity:SelectAllConnectedColorBlocks()
 				local block_id = ParaTerrain.GetBlockTemplateByIdx(x,y,z);
 				local block_data = ParaTerrain.GetBlockUserDataByIdx(x,y,z);
 				local index = BlockEngine:GetSparseIndex(x,y,z)
-				if( not block_indices[index] and y >= y0 and block_id == 10 ) then
-					blocks[#(blocks)+1] = {x,y,z, block_id, block_data};
+				if( not block_indices[index] and block_id~=0 and (block_id == block_types.names.ColorBlock or y >= y0) ) then
+					local block_template = block_types.get(block_id);
+					if(block_template and block_template:isNormalCube()) then
+						-- convert solid block to color block
+						if(block_id ~= block_types.names.ColorBlock) then
+							block_id = block_types.names.ColorBlock;
+							block_data = colorItem:ColorToData(block_template:GetBlockColorByData(block_data));
+						end
+						blocks[#(blocks)+1] = {x,y,z, block_id, block_data};
+					end
+
 					block_indices[index] = true;
-					ParaTerrain.SelectBlock(x,y,z,true); -- debug use
 					block_queue:pushright({x,y,z});
 					num_selected = num_selected + 1;
 				end
 			end
+			return true
 		end
 	end
 	AddConnectedBlockRecursive(x0,y0,z0);
 	while (not block_queue:empty()) do
 		local block = block_queue:popleft();
-		ParaTerrain.SelectBlock(block[1], block[2], block[3],true);
-		AddConnectedBlockRecursive(block[1], block[2], block[3]);
+		if(not AddConnectedBlockRecursive(block[1], block[2], block[3])) then
+			GameLogic.AddBBS("error", format(L"你最多可以用%d个方块创建人物", max_selected));
+			break;
+		end
 	end
-	ParaTerrain.DeselectAllBlock();
 	return blocks;
+end
+
+-- a thinker entity is a dummy entity showing some tips to the user
+function Entity:CreateGetThinkerEntity()
+	if(not self.thinkerEntity or not self.thinkerEntity:GetInnerObject()) then
+		local x, y, z = self:GetPosition();
+		local entity = EntityManager.EntityNPC:Create({x=x,y = y + BlockEngine.blocksize,z=z, item_id = block_types.names.TimeSeriesNPC});
+		entity:SetPersistent(false);
+		entity:SetCanRandomMove(false);
+		entity:SetDummy(true);
+		entity:SetFacing(self:ComputeModelFacing()[2]);
+		entity:Attach();
+		entity.OnClick = function(entity, x,y,z, mouse_button)
+			self:OnClickThinker();
+			return true;
+		end
+		self.thinkerEntity = entity;	
+
+		self:ShowNextThinkerModel();
+	end
+	return self.thinkerEntity;
+end
+
+function Entity:OnClickThinker(entity)
+	self:OpenEditor();
+end
+
+function Entity:DeleteThinkerEntity()
+	if(self.thinkerEntity) then
+		self.thinkerEntity:Destroy();
+		self.thinkerEntity = nil;
+	end
+end
+
+function Entity:ShowThinkerText(text, duration)
+	local entity = self:CreateGetThinkerEntity()
+	if(entity) then
+		entity:Say(text, duration or 10, true);
+	end
+end
+
+function Entity:SetThinkerModel(filename)
+	local entity = self:CreateGetThinkerEntity()
+	if(entity) then
+		entity:SetMainAssetPath(filename);
+	end
+end
+
+function Entity:ShowNextThinkerModel()
+	local entity = self:CreateGetThinkerEntity()
+	if(entity) then
+		local templates = ModelTemplatesFile:GetTemplates()
+		self.modelIndex = ((self.modelIndex or -1) +1) % (#templates);
+		local template = templates[self.modelIndex+1];
+		if(template) then
+			entity:SetMainAssetPath(template.filename);	
+		end
+	end
 end

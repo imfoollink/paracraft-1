@@ -569,7 +569,7 @@ function GameLogic.LoadGame()
     end
     
     ModManager:OnWorldLoad();
-    GameLogic:WorldLoaded();
+    GameLogic.GetFilters():apply_filters("OnWorldLoaded");
     
     local SystemSettingsPage = commonlib.gettable("Mod.Truck.UI.SystemSettingsPage");
     SystemSettingsPage.ChangeSkyBox();
@@ -845,6 +845,7 @@ function GameLogic.Exit()
 
     ModManager:OnLeaveWorld();
     GameLogic:WorldUnloaded();
+    GameLogic.GetFilters():apply_filters("OnWorldUnloaded");
     
     GameLogic.codeGlobal = nil;
 end

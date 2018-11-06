@@ -78,7 +78,6 @@ local var_longname_to_text = {
 MovieClipTimeLine.timelineHeight = 24;
 MovieClipTimeLine.timeSliderHeight = 32;
 MovieClipTimeLine.height = MovieClipTimeLine.timelineHeight*2 + MovieClipTimeLine.timeSliderHeight;
-MovieClipTimeLine.maintainAspectRatio = true;
 
 function MovieClipTimeLine.OnInit()
 	local self = MovieClipTimeLine;
@@ -315,7 +314,7 @@ function MovieClipTimeLine:ShowTimeline(state)
 		local viewport = ViewportManager:GetSceneViewport();
 		viewport:SetMarginBottom(math.floor(self.height * (Screen:GetUIScaling()[2])));
 		viewport:SetMarginBottomHandler(self);
-		if(MovieClipTimeLine.maintainAspectRatio and not viewport:GetMarginRightHandler()) then
+		if(GameLogic.options:IsMaintainMovieBlockAspectRatio() and not viewport:GetMarginRightHandler()) then
 			-- let us maintain aspect ratio
 			viewport:SetMarginRight(math.floor(self.height/Screen:GetHeight()*Screen:GetWidth() * (Screen:GetUIScaling()[1])));
 			viewport:SetMarginRightHandler(self);

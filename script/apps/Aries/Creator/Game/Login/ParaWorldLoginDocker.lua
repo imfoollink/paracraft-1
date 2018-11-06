@@ -62,6 +62,9 @@ end
 
 -- whether the given application is already loaded. 
 function ParaWorldLoginDocker.IsLoadedApp(name)
+	if(name == "exit_paraworld") then
+		return true;
+	end
 	if(System.options.mc) then
 		if(name == "paracraft" or name == "user_worlds" or name == "tutorial_worlds") then
 			return true;
@@ -159,7 +162,10 @@ function ParaWorldLoginDocker.OnClickApp(name)
 			if(name == "user_worlds") then
 				System.options.showUserWorldsOnce = true
 			elseif(name == "tutorial_worlds") then
-				ParaGlobal.ShellExecute("open", "https://keepwork.com/official/paracraft/animation-tutorials", "", "", 1)
+				--ParaGlobal.ShellExecute("open", "https://keepwork.com/official/paracraft/animation-tutorials", "", "", 1)
+				NPL.load("(gl)script/apps/Aries/Creator/Game/Login/ParaWorldLessons.lua");
+				local ParaWorldLessons = commonlib.gettable("MyCompany.Aries.Game.MainLogin.ParaWorldLessons")
+				ParaWorldLessons.ShowPage()
 				return
 			end
 
@@ -177,6 +183,16 @@ function ParaWorldLoginDocker.OnClickApp(name)
 					ParaWorldLoginDocker.Restart(name, format('paraworldapp="%s"', name))
 				end
 			end)
+		end
+	elseif(name == "paracraft_games") then
+		-- TODO: for Effie, community edition
+
+	elseif(name == "exit_paraworld") then
+		NPL.load("(gl)script/apps/Aries/Creator/Game/game_logic.lua");
+		local GameLogic = commonlib.gettable("MyCompany.Aries.Game.GameLogic");
+		if(GameLogic.GetFilters():apply_filters("exit_paraworld", true)) then
+			ParaEngine.GetAttributeObject():SetField("IsWindowClosingAllowed", true);
+			ParaGlobal.ExitApp();
 		end
 	end
 end
@@ -221,12 +237,23 @@ function ParaWorldLoginDocker.RestoreDefaultGUITemplate()
 	_guihelper.SetFontColor(_this, "#000000");
 end
 	
+function ParaWorldLoginDocker.GetRedirectableCmdLineParams()
+	local cmds = "";
+	if(ParaEngine.GetAppCommandLineByParam("httpdebug", "") == "true") then
+		cmds = cmds.." httpdebug=\"true\"";
+	end
+	-- keepwork token forward here
+	if(System.User and System.User.keepworktoken) then
+		cmds = cmds..format(" keepworktoken=\"%s\"", System.User.keepworktoken);
+	end
+	return cmds;
+end
 
 -- Restart the entire NPLRuntime to a different application. e.g.
 -- Desktop.Restart("haqi")
 -- Desktop.Restart("paracraft")
 -- @param appName: nil default to application at working directory. 
-function ParaWorldLoginDocker.Restart(appName, additional_commandline_params)
+function ParaWorldLoginDocker.Restart(appName, additional_commandline_params, additional_restart_code)
 	if(not appName) then
 		appName = ParaWorldLoginDocker.GetSourceAppName()
 		if(not additional_commandline_params) then
@@ -243,6 +270,7 @@ function ParaWorldLoginDocker.Restart(appName, additional_commandline_params)
 
 	local srcAppName = ParaWorldLoginDocker.GetSourceAppName()
 	newCmdLine = format("%s src_paraworldapp=\"%s\"", newCmdLine, srcAppName);
+	newCmdLine = newCmdLine.." "..(ParaWorldLoginDocker.GetRedirectableCmdLineParams() or "");
 
 	local app = ParaWorldLoginDocker.GetAppInstallDetails(appName);
 	if(app) then
@@ -313,6 +341,9 @@ function ParaWorldLoginDocker.Restart(appName, additional_commandline_params)
 	System.options.cmdline_world="";
 	NPL.activate("(gl)script/apps/Aries/main_loop.lua");
 ]];
+	if(additional_restart_code) then
+		restart_code = restart_code .. additional_restart_code;
+	end
 
 	-- TODO: close world archives, packages and search paths
 
