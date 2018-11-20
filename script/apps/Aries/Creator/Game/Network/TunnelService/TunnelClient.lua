@@ -204,7 +204,7 @@ function TunnelClient:handleCmdMsg(msg)
 		self:SetAuthenticated(msg.result == true);
 		LOG.std(nil, "info", "TunnelClient", "tunnel client `%s` is authenticated : %s", self.username , msg.result);
 	elseif (type == "tunnel_connect") then
-		LOG.std(nil, "info", "TunnelClient", "host %s is connected: %s", self.username, msg.result);
+		LOG.std(nil, "info", "TunnelClient", "host %s is connected: %s", self.hostname, msg.result);
 
 	elseif (msg.type=="tunnel_disconnect") then
 		conn = self.virtualConns[msg.target];
