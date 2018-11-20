@@ -119,8 +119,10 @@ local options = commonlib.createtable("MyCompany.Aries.Game.GameLogic.options", 
 	-- whether to enable left click to move in game mode. 
 	leftClickToMove = false,
 	ask_for_help_url = L"http://bbs.paraengine.com/forum.php?mod=forumdisplay&fid=51",
-	bbs_home_url = L"http://www.paracraft.cn/",
-	bbs_upload_url = L"http://bbs.paraengine.com/forum.php?mod=forumdisplay&fid=50",
+	bbs_home_url = L"https://keepwork.com/official/creativeTimes/latest",
+	--bbs_home_url = L"http://paracraft.keepwork.com/",
+	--bbs_upload_url = L"http://bbs.paraengine.com/forum.php?mod=forumdisplay&fid=50",
+	bbs_upload_url = L"https://tieba.baidu.com/f?kw=%E9%AD%94%E6%B3%95%E5%93%88%E5%A5%87",
 	credits_url = L"https://github.com/LiXizhi/ParaCraftSDK/wiki/Credits",
 	-- whether we are cheating on some of the functions
 	is_cheating = false,
@@ -164,6 +166,8 @@ function options:OneTimeInit()
 			GameLogic.GetPlayerController():SaveLocalData(key, false, true);
 		end
 	end
+
+	self:SetMaintainMovieBlockAspectRatio();
 end
 
 -- transient options can be modified by game rule and reset when loading a new world.
@@ -1080,4 +1084,20 @@ end
 -- another way to set: `/property set -camera IgnoreEyeBlockCollisionInSunlight false`
 function options:SetIgnoreEyeBlockCollisionInSunlight(bIgnored)
 	ParaCamera.GetAttributeObject():GetField("IgnoreEyeBlockCollisionInSunlight", bIgnored == true);
+end
+
+function options:IsMaintainMovieBlockAspectRatio()
+	return self.maintainMovieBlockAspectRatio;
+end
+
+function options:SetMaintainMovieBlockAspectRatio(value)
+	local key = "Paracraft_maintainMovieBlockAspectRatio";
+	if(value == nil) then
+		if(self.maintainMovieBlockAspectRatio == nil) then
+			self.maintainMovieBlockAspectRatio = GameLogic.GetPlayerController():LoadLocalData(key,self:IsMaintainMovieBlockAspectRatio(), true);
+		end
+	elseif(self.maintainMovieBlockAspectRatio ~= value) then
+		self.maintainMovieBlockAspectRatio = value;
+		GameLogic.GetPlayerController():SaveLocalData(key, value, true, false);
+	end
 end

@@ -33,14 +33,16 @@ function Map3DSystem_OnSystemEvent()
 				Map3DSystem.App.Commands.Call(Map3DSystem.App.Commands.GetDefaultCommand("SYS_WM_DROPFILES"), filelist);
 			end
 		end
-	elseif(event_type == Sys_Event.SYS_WM_CLOSE) then	
-		if(commonlib.getfield("MyCompany.Aries")) then
-			Map3DSystem.App.Commands.Call("Profile.Aries.OnCloseApp");
-		else
-			_guihelper.MessageBox("您确定要退出么？", function()
-				ParaEngine.GetAttributeObject():SetField("IsWindowClosingAllowed", true);
-				ParaGlobal.ExitApp();
-			end)
+	elseif(event_type == Sys_Event.SYS_WM_CLOSE) then
+		if (not GameLogic.GetFilters():apply_filters("event_handlers_system_OnSystemEvent_sys_wm_close")) then
+			if(commonlib.getfield("MyCompany.Aries")) then
+				Map3DSystem.App.Commands.Call("Profile.Aries.OnCloseApp");
+			else
+				_guihelper.MessageBox("您确定要退出么？", function()
+					ParaEngine.GetAttributeObject():SetField("IsWindowClosingAllowed", true);
+					ParaGlobal.ExitApp();
+				end)
+			end
 		end
 	elseif(event_type == Sys_Event.SYS_WM_DESTROY) then
 		if(commonlib.getfield("MyCompany.Aries")) then
