@@ -124,7 +124,12 @@ toggle first person camera
 		NPL.load("(gl)script/apps/Aries/Creator/Game/World/CameraController.lua");
 		local CameraController = commonlib.gettable("MyCompany.Aries.Game.CameraController")
 		-- BroadcastHelper.PushLabel({id="GameLogic", label = "第一人称FPS模式开启", max_duration=20000, color = "0 255 0", scaling=1.1, bold=true, shadow=true,});
-		CameraController.ToggleCamera(cmd_text == "true" or cmd_text=="1" or cmd_text=="");
+		local isfps = cmd_text == "true" or cmd_text=="1" or cmd_text=="";
+		if isfps then 
+			CameraController.ToggleCamera(1);
+		else
+			CameraController.ToggleCamera(0);
+		end
 	end,
 };
 
