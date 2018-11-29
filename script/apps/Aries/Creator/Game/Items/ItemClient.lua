@@ -214,6 +214,29 @@ function ItemClient.SearchBlocks(block_id_or_name, category_name, ds)
 					end
 				end
 			end
+    elseif(type(block_id_or_name) == "string") then
+      if category_name then
+        --local pattern_search = "*("..block_id_or_name..")*";
+        local ds_src = ItemClient.GetBlockDS(category_name);
+        local category_ds,index,item;
+        ds = ds or {};
+          for index, item in ipairs(ds_src) do 
+            --if(item.block_id == block_id) then
+            local id = tostring(item.id);
+            if(id and string.match(id,block_id_or_name)) then
+              ds[#ds+1] = item;
+            else
+              local searchkey = item:GetSearchKey();
+              if(searchkey and string.match(searchkey,block_id_or_name)) then
+                ds[#ds+1] = item;
+              end
+            end
+            --if(string.match(tostring(item.id),block_id_or_name) or string.match(item.name,block_id_or_name)) then						
+              --ds[#ds+1] = item;						
+            --end
+          end	
+        return ds;
+      end
 		end
 	end
 end
