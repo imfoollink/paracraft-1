@@ -18,6 +18,11 @@
 ]]
 
 echo("dev_team", "----------------------------------GameLogic Loaded----------------------------------");
+echo("cellfy", "----------------------------------changing asset server to:----------------------------------");
+echo("cellfy", "http://193.112.2.67:9085/update/");
+
+ParaAsset.SetAssetServerUrl("http://193.112.2.67:9085/update/");
+
 --init truck dependencies
 NPL.load("npl_packages/nplprotobuf/");
 --sw
