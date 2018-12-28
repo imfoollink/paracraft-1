@@ -691,7 +691,14 @@ function NetClientHandler:handleSetScript(packet)
 	tasks:execute(function ()
         BroadcastHelper.PushLabel({id="download script", label = TL"模块下载完成", max_duration = 2000, color =  "255 255 255", scaling=1, bold=true, shadow=true,});
 
-		SavedData.load(function ()
+        BroadcastHelper.PushLabel({id="download saveddata", label = TL"加载存档中", max_duration = 10000, color =  "255 255 255", scaling=1, bold=true, shadow=true,});
+
+		SavedData.load(function (err)
+			if err then
+				BroadcastHelper.PushLabel({id="download saveddata", label = TL"加载存档失败", max_duration = 2000, color =  "255 255 255", scaling=1, bold=true, shadow=true,});
+			else
+				BroadcastHelper.PushLabel({id="download saveddata", label = TL"加载存档完成", max_duration = 2000, color =  "255 255 255", scaling=1, bold=true, shadow=true,});
+			end
 			Independent.stop();
 			Independent.prepare(files);
 			Independent.start();

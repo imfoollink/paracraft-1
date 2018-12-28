@@ -567,7 +567,12 @@ end
 -- @param result: result.x, result.y, result.z, result.length.  picking result. 
 -- @param max_picking_dist: the global picking distance 
 function CameraController.OnMousePick(result, max_picking_dist)
-	if(not CameraController.IsLockPlayerHead() and result) then
+	if(not CameraController.IsLockPlayerHead() and result and not (
+		ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_W) or 
+		ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_A) or
+		ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_D) or 
+		ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_S)
+	)) then
 		local player = EntityManager.GetFocus();
 		if(player) then
 			local attr = ParaCamera.GetAttributeObject();
