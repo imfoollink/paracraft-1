@@ -18,6 +18,11 @@
 ]]
 
 echo("dev_team", "----------------------------------GameLogic Loaded----------------------------------");
+echo("cellfy", "----------------------------------changing asset server to:----------------------------------");
+echo("cellfy", "http://cdn.keepwork.com/update61/assetdownload/update/");
+
+ParaAsset.SetAssetServerUrl("http://cdn.keepwork.com/update61/assetdownload/update/");
+
 --init truck dependencies
 NPL.load("npl_packages/nplprotobuf/");
 --sw
