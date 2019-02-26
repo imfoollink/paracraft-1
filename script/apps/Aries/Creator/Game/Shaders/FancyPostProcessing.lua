@@ -473,7 +473,7 @@ function FancyV1:OnRenderHighWithHDR(ps_scene, nPass)
         params:SetVector4("HDRParameter",self:GetHDRLuminance(),self:GetHDRMiddleGray(),self:GetHDRBrightThreshold(),self:GetHDRBrightOffset());
         params:SetTextureObj(0, _CompositeRT_DownScale16x16_0);
         effect:CommitChanges();
-        ParaEngine.DrawQuad(1);
+        ParaEngine.DrawQuad2();
       effect:EndPass();
       params:SetVector4("TextureSize0", _CompositeRT_DownScale16x16_0:GetWidth(),_CompositeRT_DownScale16x16_0:GetHeight(),1/_CompositeRT_DownScale16x16_0:GetWidth(),1/_CompositeRT_DownScale16x16_0:GetHeight());
       params:SetFloat("BloomScale",self:GetBloomScale());
@@ -484,7 +484,7 @@ function FancyV1:OnRenderHighWithHDR(ps_scene, nPass)
           -- color render target. 
           params:SetTextureObj(0, _CompositeRT_DownScale16x16_1);
           effect:CommitChanges();
-          ParaEngine.DrawQuad(1);
+          ParaEngine.DrawQuad2();
         effect:EndPass();
         --v bloom
         ParaEngine.SetRenderTarget(_CompositeRT_DownScale16x16_1);
@@ -492,7 +492,7 @@ function FancyV1:OnRenderHighWithHDR(ps_scene, nPass)
           -- color render target. 
           params:SetTextureObj(0, _CompositeRT_DownScale16x16_0);
           effect:CommitChanges();
-          ParaEngine.DrawQuad(1);
+          ParaEngine.DrawQuad2();
         effect:EndPass();
       end
       --combine
