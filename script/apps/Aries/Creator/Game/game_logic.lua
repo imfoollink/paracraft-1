@@ -577,7 +577,7 @@ function GameLogic.LoadGame()
     GameLogic.GetFilters():apply_filters("OnWorldLoaded");
     
     local SystemSettingsPage = commonlib.gettable("Mod.Truck.UI.SystemSettingsPage");
-    SystemSettingsPage.ChangeSkyBox();
+    --SystemSettingsPage.ChangeSkyBox();
     SystemSettingsPage.setting_ds["render_dist"]=MyCompany.Aries.Player.LoadLocalData("Paracraft_System_Render_Distance",150,true);
     options:SetRenderDist(SystemSettingsPage.setting_ds["render_dist"]);
     ParaTerrain.GetBlockAttributeObject():SetField("UseWaterReflection",SystemSettingsPage.setting_ds["water_reflection"]);
