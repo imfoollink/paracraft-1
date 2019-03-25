@@ -475,7 +475,7 @@ local function TruckDrawTextNodeHandlerFilter(text,_parent,treeNode)
     mcml_str=mcml_str..[[<div style="margin-left:100px;margin-top:-95px;color:#62677b;base-font-size:30px;font-size:30px">]];
     local name;
     if decoded.mFromUserID then
-      name=decoded.mFromUserNickName;
+      name=decoded.mFromUserNickName0;
     elseif decoded.mFromName then
       name=decoded.mFromName;
     end
@@ -516,7 +516,7 @@ local function TruckDrawTextNodeHandlerFilter2(text,_parent,treeNode)
     local name;
     if decoded.mFromUserID then
       mcml_str=mcml_str..[[<div style="margin-left:5px;margin-top:-5px;color:#ffffff;base-font-size:20px;font-size:20px">]];
-      name=decoded.mFromUserNickName;
+      name=decoded.mFromUserNickName0;
     elseif decoded.mFromName then
       mcml_str=mcml_str..[[<div style="margin-left:5px;margin-top:-5px;color:#FFFF99;base-font-size:20px;font-size:20px">]];
       name=decoded.mFromName;
