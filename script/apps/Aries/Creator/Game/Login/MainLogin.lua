@@ -93,7 +93,7 @@ end
 
 function MainLogin:checkInstallUrlProtocol()
 	local protocol_name = "truckstar";
-	local app_name = "AwesomeTruck.exe"
+	local app_name = "ParaEngineClient.exe"
 	NPL.load("(gl)script/apps/Aries/Creator/Game/Login/UrlProtocolHandler.lua");
 	local UrlProtocolHandler = commonlib.gettable("MyCompany.Aries.Creator.Game.UrlProtocolHandler");
 	if(System.options.mc and System.os.GetPlatform() == "win32" and GameLogic.platformIdentity ~= "paraworld") then
