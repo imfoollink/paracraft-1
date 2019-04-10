@@ -18,6 +18,7 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/BonesVariable.lua");
 NPL.load("(gl)script/ide/math/Quaternion.lua");
 local Matrix4 = commonlib.gettable("mathlib.Matrix4");
 local Quaternion = commonlib.gettable("mathlib.Quaternion");
+local math3d = commonlib.gettable("mathlib.math3d");
 local BonesVariable = commonlib.gettable("MyCompany.Aries.Game.Movie.BonesVariable");
 local CmdParser = commonlib.gettable("MyCompany.Aries.Game.CmdParser");
 local MultiAnimBlock = commonlib.gettable("MyCompany.Aries.Game.Common.MultiAnimBlock");
@@ -28,6 +29,7 @@ local SlashCommand = commonlib.gettable("MyCompany.Aries.SlashCommand.SlashComma
 local BlockEngine = commonlib.gettable("MyCompany.Aries.Game.BlockEngine")
 local block_types = commonlib.gettable("MyCompany.Aries.Game.block_types")
 local GameLogic = commonlib.gettable("MyCompany.Aries.Game.GameLogic")
+local Direction = commonlib.gettable("MyCompany.Aries.Game.Common.Direction")
 local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
 
 
@@ -35,6 +37,7 @@ local Actor = commonlib.inherit(commonlib.gettable("MyCompany.Aries.Game.Movie.A
 
 Actor.class_name = "ActorNPC";
 Actor:Property({"entityClass", "EntityNPC"});
+Actor:Property({"offset_facing", nil, "GetOffsetFacing", "SetOffsetFacing", auto=true});
 -- asset file is changed
 Actor:Signal("assetfileChanged");
 
@@ -49,12 +52,18 @@ local selectable_var_list = {
 	"facing", 
 	"rot", -- multiple of "roll", "pitch", "facing"
 	"head", -- multiple of "HeadUpdownAngle", "HeadTurningAngle"
-	"scaling", "speedscale", "gravity", "opacity", "blocks", "parent",
+	"scaling", "speedscale", "gravity", "opacity", "blocks", "parent", 
+	"static", -- multiple of "name" and "isAgent"
 };
 
 
 function Actor:ctor()
 	self.actor_block = ActorBlock:new();
+end
+
+function Actor:DeleteThisActor()
+	self:OnRemove();
+	self:Destroy();
 end
 
 function Actor:GetMultiVariable()
@@ -75,6 +84,20 @@ function Actor:GetMultiVariable()
 		var:AddVariable(self:GetVariable("assetfile"));
 		var:AddVariable(self:GetVariable("scaling"));
 		self:SetCustomVariable("multi_variable", var);
+		return var;
+	end
+end
+
+-- get rotate multi variable
+function Actor:GetStaticVariable()
+	local var = self:GetCustomVariable("static_variable");
+	if(var) then
+		return var;
+	else
+		var = MultiAnimBlock:new({name="static"});
+		var:AddVariable(self:GetVariable("name"));
+		var:AddVariable(self:GetVariable("isAgent"));
+		self:SetCustomVariable("static_variable", var);
 		return var;
 	end
 end
@@ -164,10 +187,12 @@ function Actor:GetBonesVariable()
 	return self.bones_variable;
 end
 
-function Actor:Init(itemStack, movieclipEntity)
+-- @param isReuseActor: whether we will reuse actor in the scene with the same name instead of creating a new entity. default to false.
+-- @param newName: if not provided, it will use the name in itemStack
+function Actor:Init(itemStack, movieclipEntity, isReuseActor, newName, movieclip)
 	self.actor_block:Init(itemStack, movieclipEntity);
 	-- base class must be called last, so that child actors have created their own variables on itemStack. 
-	if(not Actor._super.Init(self, itemStack, movieclipEntity)) then
+	if(not Actor._super.Init(self, itemStack, movieclipEntity, movieclip)) then
 		return;
 	end
 
@@ -186,6 +211,7 @@ function Actor:Init(itemStack, movieclipEntity)
 	timeseries:CreateVariableIfNotExist("gravity", "Discrete");
 	timeseries:CreateVariableIfNotExist("scaling", "Linear");
 	timeseries:CreateVariableIfNotExist("name", "Discrete");
+	timeseries:CreateVariableIfNotExist("isAgent", "Discrete"); -- true, nil|false, "relative", "searchNearPlayer"
 	timeseries:CreateVariableIfNotExist("skin", "Discrete");
 	timeseries:CreateVariableIfNotExist("blockinhand", "Discrete");
 	timeseries:CreateVariableIfNotExist("opacity", "Linear");
@@ -204,13 +230,86 @@ function Actor:Init(itemStack, movieclipEntity)
 		anim = self:GetValue("anim", 0);
 		facing = self:GetValue("facing", 0);
 		skin = self:GetValue("skin", 0);
-		opacity = self:GetValue("opacity", nil);
-		name = self:GetValue("name", 0);
+		opacity = self:GetValue("opacity", 0);
+		name = newName or self:GetValue("name", 0);
+		local isAgent = self:GetValue("isAgent", 0);
+		if(isReuseActor == nil) then
+			isReuseActor = isAgent
+		end
 
-		self.entity = EntityManager[self.entityClass]:Create({x=x,y=y,z=z, facing=facing, 
-			opacity = opacity, item_id = block_types.names.TimeSeriesNPC, 
-			});
-		if(self.entity) then
+		if((isReuseActor or isAgent) and name and name~="") then
+			local entity;
+			local offsetFacing;
+			if(name == "player") then
+				entity = EntityManager.GetPlayer();
+			else
+				if(isReuseActor == "searchNearPlayer") then
+					local playerActor = movieClip:FindActor("player");
+					if(playerActor) then	
+						-- if the movie clip already contains a player, we will use it to locate the entity
+						local x, y, z = playerActor:TransformToEntityPosition(x, y, z)
+						local bx, by, bz = BlockEngine:block(x, y+0.1, z);
+						local r = 1;
+						local entities = EntityManager.GetEntitiesByMinMax(bx-r, by-r, bz-r, bx+r, by+r, bz+r)
+						if(entities and #entities>0) then
+							-- tricky: we will match either name or assetfile 
+							local assetfile = self:GetValue("assetfile", 0);
+							for i, entity_ in ipairs(entities) do
+								if(entity_:GetName() == name) then
+									entity = entity_;
+									break;
+								elseif(entity_.GetModelFile and entity_:GetModelFile() == assetfile) then
+									entity = entity_;
+									break;
+								end
+							end
+						end
+						if (entity) then
+							-- tricky: always use relative facing of the nearby player actor
+							offsetFacing = playerActor:GetOffsetFacing()
+						end
+					else
+						-- search near the current player
+						local x, y, z = EntityManager.GetPlayer():GetBlockPos()
+						local r = 5;
+						local entities = EntityManager.FindEntities({name = name, x=x,  y=y, z=z, r=r})
+						if(entities and #entities>0) then
+							entity = entities[1];
+							if(entity and not entity.SetActor) then
+								entity = nil;
+							end
+						end
+					end
+				end
+				if(not entity) then
+					entity = EntityManager.GetEntity(name);
+					if(entity and not entity.SetActor) then
+						entity = nil;
+					end
+				end
+			end
+			if(isAgent and isReuseActor==false and (not newName) and entity) then
+				-- tricky: we still need to reuse actor, even if isReuseActor == false under above conditions
+				isReuseActor = true;
+			end
+
+			if(isReuseActor and entity) then
+				self:BecomeAgent(entity);
+				if(isReuseActor == "relative" or isReuseActor == "searchNearPlayer") then
+					self:CalculateRelativeParams();
+					if(offsetFacing) then
+						self:SetOffsetFacing(offsetFacing);
+					end
+				end
+			end
+		end
+		if(not self.entity) then
+			self.entity = EntityManager[self.entityClass]:Create({name=name, x=x,y=y,z=z, facing=facing, 
+				opacity = opacity, item_id = block_types.names.TimeSeriesNPC, 
+			});	
+		end
+		
+		if(self.entity and not self:IsAgent()) then
 			self.entity:SetActor(self);
 			self.entity:SetPersistent(false);
 			self.entity:SetDummy(true);
@@ -223,8 +322,70 @@ function Actor:Init(itemStack, movieclipEntity)
 			-- self.entity:EnableLOD(false);
 			self.entity:Attach();
 			self:CheckLoadBonesAnims();
+
+			if(isReuseActor) then
+				-- just incase the reused actor is not found, we will create a new one and become an agent of it. 
+				self:BecomeAgent(self.entity);
+			end
 		end
 		return self;
+	end
+end
+
+-- from data source coordinate to entity coordinate according to CalculateRelativeParams()
+function Actor:TransformToEntityPosition(x, y, z)
+	x = x + (self.offset_x or 0);
+	y = y + (self.offset_y or 0);
+	z = z + (self.offset_z or 0);
+	
+	if((self.offset_facing or 0) ~= 0) then
+		local dx, _, dz = math3d.vec3Rotate(x - self.origin_x, 0, z - self.origin_z, 0, self.offset_facing, 0);
+		x = dx + self.origin_x;
+		z = dz + self.origin_z;
+	end
+	return x,y,z;
+end
+
+-- from data source coordinate to entity coordinate according to CalculateRelativeParams()
+function Actor:TransformToEntityFacing(facing)
+	return facing + (self.offset_facing or 0);
+end
+
+function Actor:IsAgentRelative()
+	return self.origin_x~=nil;
+end
+
+-- calculate relative params at time 0 according to the current entity's parameters
+-- so that all time series values are relative to time 0, instead of absolute values in data source. 
+-- currently, only entity position and facing are taking in to account and snapped to block position and 4 direction. 
+-- calculated values in self.offset_x, self.offset_y, self.offset_z, self.offset_facing
+function Actor:CalculateRelativeParams()
+	local entity = self:GetEntity();
+	if(entity) then
+		local obj = entity:GetInnerObject();
+		if(not obj) then
+			return
+		end	
+		-- relative position
+		local entity_bx, entity_by, entity_bz = entity:GetBlockPos();
+		local entity_x, entity_y, entity_z = entity:GetPosition();
+		local entity_facing = entity:GetFacing() or 0;
+		
+		local memory_x, memory_y, memory_z = self:GetValue("x", 0), self:GetValue("y", 0), self:GetValue("z", 0);
+		local memory_bx, memory_by, memory_bz = BlockEngine:block(memory_x, memory_y+0.1, memory_z);
+		local memory_facing = self:GetValue("facing", 0) or 0;
+		
+		self.offset_x = (entity_bx - memory_bx)*BlockEngine.blocksize;
+		self.offset_y = (entity_by - memory_by)*BlockEngine.blocksize;
+		self.offset_z = (entity_bz - memory_bz)*BlockEngine.blocksize;
+		self.origin_x, self.origin_y, self.origin_z = BlockEngine:real(entity_bx, entity_by, entity_bz);
+
+		-- relative facing
+		local memory_dir_facing = Direction.NormalizeFacing(memory_facing)
+		local entity_dir_facing = Direction.NormalizeFacing(entity_facing)
+		self.offset_facing = mathlib.ToStandardAngle(entity_dir_facing - memory_dir_facing);
+
+		-- echo({self.offset_x, self.offset_y, self.offset_z, self.offset_facing})
 	end
 end
 
@@ -288,6 +449,8 @@ function Actor:GetEditableVariable(selected_index)
 		var = self:GetBonesVariable();
 	elseif(name == "blocks") then
 		var = self:GetBlocksVariable();
+	elseif(name == "static") then
+		var = self:GetStaticVariable();
 	else
 		var = self.TimeSeries:GetVariable(name);
 	end
@@ -624,6 +787,22 @@ function Actor:CreateKeyFromUI(keyname, callbackFunc)
 				callbackFunc(true);
 			end
 		end, old_value);
+	elseif(keyname == "static") then
+		old_value = {name = self:GetValue("name", 0) or "", isAgent = self:GetValue("isAgent", 0)}
+		NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/EditStaticPropertyPage.lua");
+		local EditStaticPropertyPage = commonlib.gettable("MyCompany.Aries.Game.Movie.EditStaticPropertyPage");
+		EditStaticPropertyPage.ShowPage(function(values)
+			if(values.name ~= old_value.name) then
+				self:AddKeyFrameByName("name", 0, values.name);
+				self:SetDisplayName(values.name)
+			end
+			if(values.isAgent ~= old_value.isAgent) then
+				self:AddKeyFrameByName("isAgent", 0, values.isAgent);
+			end
+			if(callbackFunc) then
+				callbackFunc(true);
+			end
+		end, old_value);
 	end
 end
 
@@ -818,6 +997,58 @@ function Actor:UpdateAnimInstance()
 	end
 end
 
+-- in world coordinate system
+-- @param boneName: name of the bone. if nil or "", it is the current actor's root position
+-- @return x,y,z, roll, pitch yaw, scale: in world space.  
+function Actor:ComputeBoneWorldTransform(bonename, bUseParentRotation)
+	local link_x, link_y, link_z = self:GetEntity():GetPosition();
+	if(bonename and bonename~="") then
+		local bFoundTarget;
+		self.parentPivot = self.parentPivot or mathlib.vector3d:new();
+						
+		local parentBoneRotMat;
+		local bones = self:GetBonesVariable();
+		local boneVar = bones:GetChild(bonename);
+		if(boneVar) then
+			self:UpdateAnimInstance();
+			local pivot = boneVar:GetPivot(true);
+			self.parentPivot:set(pivot);
+			if(bUseParentRotation) then
+				parentBoneRotMat = boneVar:GetPivotRotation(true);
+			end
+			bFoundTarget = true;
+		end
+		if(bFoundTarget) then
+			local parentObj = self:GetEntity():GetInnerObject();
+			local parentScale = parentObj:GetScale() or 1;
+			local dx,dy,dz = 0,0,0;
+			if(not bUseParentRotation and localPos) then
+				self.parentPivot:add((localPos[1] or 0), (localPos[2] or 0), (localPos[3] or 0));
+			end
+
+			self.parentTrans = self.parentTrans or mathlib.Matrix4:new();
+			self.parentTrans = parentObj:GetField("LocalTransform", self.parentTrans);
+			self.parentPivot:multiplyInPlace(self.parentTrans);
+			self.parentQuat = self.parentQuat or mathlib.Quaternion:new();
+			if(parentScale~=1) then
+				self.parentTrans:RemoveScaling();
+			end
+			self.parentQuat:FromRotationMatrix(self.parentTrans);
+			if(bUseParentRotation and parentBoneRotMat) then
+				self.parentPivotRot = self.parentPivotRot or Quaternion:new();
+				self.parentPivotRot:FromRotationMatrix(parentBoneRotMat);
+				self.parentQuat:multiplyInplace(self.parentPivotRot);
+			end
+			
+			local p_roll, p_pitch, p_yaw = self.parentQuat:ToEulerAnglesSequence("zxy");
+			
+			return link_x + self.parentPivot[1] + dx, link_y + self.parentPivot[2] + dy, link_z + self.parentPivot[3] + dz,
+				 p_roll, p_pitch, p_yaw, parentScale;
+		end
+	end
+	return link_x, link_y, link_z;
+end
+
 -- get world transform of a given sub part (bone).
 -- @param keypath: subpart of this actor of which we are computing, such as "bones::R_Hand", if nil it is current actor.
 -- @param localPos: if not nil, this is the local offset
@@ -942,6 +1173,10 @@ function Actor:ComputePosAndRotation(curTime)
 			end
 		end
 	end
+	if(self:IsAgentRelative()) then
+		new_x, new_y, new_z = self:TransformToEntityPosition(new_x, new_y, new_z);
+	end
+	yaw = self:TransformToEntityFacing(yaw or 0);
 	return new_x, new_y, new_z, yaw, roll, pitch;
 end
 
@@ -1129,6 +1364,25 @@ function Actor:OnChangeBone(bone_name)
 	end
 end
 
+-- set the local bone time
+-- @param boneName: a precise bone name or regular expression, like "hand" or ".*hand"
+-- @param time: if nil or -1, it will remove bone time. 
+function Actor:SetBoneTime(boneName, time)
+	local var = self:GetBonesVariable();
+	if(var) then
+		local variables = var:GetVariables();
+		if(variables[boneName]) then
+			variables[boneName]:SetTime(time);
+		else
+			for name, bone in pairs(variables) do
+				if(name:match(boneName)) then
+					bone:SetTime(time);
+				end
+			end
+		end
+	end
+end
+
 function Actor:DestroyEntity()
 	Actor._super.DestroyEntity(self)
 	if(self.bones_variable) then
@@ -1150,4 +1404,17 @@ end
 function Actor:BecomeAgent(entity)
 	Actor._super.BecomeAgent(self, entity);
 	self:CheckLoadBonesAnims();
+end
+
+-- when deactivated we will release the control to human player with this function.
+function Actor:ReleaseEntityControl()
+	self:SetControllable(true);
+	self:UnbindAnimInstance();
+end
+
+function Actor:DestroyEntity()
+	if(self:IsAgent() and self.entity) then
+		self:ReleaseEntityControl();
+	end
+	Actor._super.DestroyEntity(self);
 end

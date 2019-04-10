@@ -34,14 +34,13 @@ function OnEnterTempUser()
 end
 
 function OnEnterKeepWorkUser()
-    local LoginMain = NPL.load("(gl)Mod/WorldShare/cellar/Login/LoginMain.lua")
-	if(LoginMain.IsSignedIn()) then
-		EnterClass()
-	else
-		LoginMain.ShowLoginModal(function()
-			EnterClass()
-		end, L"登陆后才能访问课程系统, 请先登录");
-	end
+    NPL.load("(gl)script/apps/Aries/Creator/Game/Login/ParaWorldLoginDocker.lua");
+    local ParaWorldLoginDocker = commonlib.gettable("MyCompany.Aries.Game.MainLogin.ParaWorldLoginDocker")
+    ParaWorldLoginDocker.SignIn(L"登陆后才能访问课程系统, 请先登录", function(bSucceed)
+        if(bSucceed) then
+            EnterClass()
+        end
+    end)
     OnClose()
 end
 ]]></script>

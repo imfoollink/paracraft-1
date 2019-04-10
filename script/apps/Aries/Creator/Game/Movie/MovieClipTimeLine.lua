@@ -60,10 +60,12 @@ local var_name_to_text = {
 	opacity = L"透明度",
 	pos = L"位置",
 	screen_pos = L"屏幕坐标",
+	ui_align = L"屏幕坐标对齐方式",
 	parent = L"父链接",
 	color = L"颜色",
 	code = L"代码",
 	emoji = L"表情"
+	static = L"静态属性",
 }
 local var_longname_to_text = {
 	anim = L"动作 (1键)",
@@ -380,7 +382,11 @@ function MovieClipTimeLine.OnClickToggleSubVariable()
 						if(node.originalActor and node.originalIndex and node.originalActor~=node.actor) then
 							node.originalActor:SetCurrentEditVariableIndex(node.originalIndex);
 						end
+
 						node.actor:SetCurrentEditVariableIndex(tonumber(node.Name));
+
+						GameLogic.GetFilters():apply_filters("user_event_stat", "actor", "edit:"..tostring(node.actor:GetEditableVariable().name), 1, nil);
+
 						Game.SelectionManager:selectedActorVariableChanged(node.actor:GetEditableVariable(), node.actor);
 					end
 				end

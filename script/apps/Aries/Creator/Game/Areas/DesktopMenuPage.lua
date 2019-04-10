@@ -24,6 +24,36 @@ function DesktopMenuPage.OnInit()
 	page = document:GetPageCtrl();
 	DesktopMenu.Init();
 	GameLogic.GetEvents():AddEventListener("game_mode_change", DesktopMenuPage.OnGameModeChanged, DesktopMenuPage, "DesktopMenuPage");
+	GameLogic:Connect("WorldLoaded", DesktopMenuPage, DesktopMenuPage.OnWorldLoaded, "UniqueConnection");
+end
+
+function DesktopMenuPage.GetProjectText()
+    if(GameLogic.options:GetProjectId()) then
+        return format(L"项目ID:%s", tostring(GameLogic.options:GetProjectId()));
+    else
+        return L"上传世界";
+    end
+end
+
+function DesktopMenuPage.OnClickProjectId()
+	if(GameLogic.options:GetProjectId()) then
+		local KeepworkService = NPL.load("(gl)Mod/WorldShare/service/KeepworkService.lua");
+		if(KeepworkService) then
+			-- local url = KeepworkService:GetShareUrl()
+			local url = format("https://keepwork.com/pbl/project/%s", tostring(GameLogic.options:GetProjectId()))
+			if(url) then
+				ParaGlobal.ShellExecute("open", url, "", "", 1)
+			end
+		end
+	else
+		GameLogic.RunCommand("/file.uploadworld")
+	end
+end
+
+function DesktopMenuPage.OnWorldLoaded()
+	if(page) then
+		page:SetValue("projectId", DesktopMenuPage.GetProjectText())
+	end
 end
 
 function DesktopMenuPage.OnGameModeChanged()
@@ -49,6 +79,25 @@ end
 function DesktopMenuPage.TogglePinned()
 	DesktopMenuPage.IsPinned = not DesktopMenuPage.IsPinned;
 	DesktopMenuPage.Refresh();
+
+	NPL.load("(gl)script/ide/System/Windows/Screen.lua");
+	NPL.load("(gl)script/ide/System/Scene/Viewports/ViewportManager.lua");
+	local ViewportManager = commonlib.gettable("System.Scene.Viewports.ViewportManager");
+	local Screen = commonlib.gettable("System.Windows.Screen");
+	local viewport = ViewportManager:GetSceneViewport();
+	if(DesktopMenuPage.IsPinned) then
+		local height = 32;
+		if(viewport:GetMarginTopHandler() == nil) then
+			viewport:SetTop(math.floor(32 * (Screen:GetUIScaling()[2])));
+			viewport:SetMarginTopHandler(DesktopMenuPage);
+		end
+	else
+		viewport:SetTop(0);
+		if(viewport:GetMarginTopHandler() == DesktopMenuPage) then
+			viewport:SetMarginTopHandler(nil);
+		end
+	end
+
 	if(not DesktopMenuPage.IsPinned) then
 		DesktopMenuPage.ActivateMenu(false);
 	end
@@ -61,6 +110,8 @@ function DesktopMenuPage.ActivateMenu(bActivate)
 	end
 	DesktopMenuPage.IsActivated = bActivate;
 	if(bActivate) then
+		-- GameLogic.GetFilters():apply_filters("user_event_stat", "inventory", "browse", nil, nil);
+
 		if(not page or not page:IsVisible()) then
 			DesktopMenuPage.ShowPage(true);
 		end

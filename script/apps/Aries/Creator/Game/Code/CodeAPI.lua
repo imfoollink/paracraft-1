@@ -15,6 +15,7 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeAPI_MotionLooks.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeAPI_Sensing.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeAPI_Sound.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeAPI_Data.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeAPI_Control.lua");
 
 -- all public environment methods. 
 local s_env_methods = {
@@ -24,16 +25,17 @@ local s_env_methods = {
 	"GetEntity",
 	"restart",
 	"exit",
+	"xpcall",
 	-- Data
 	"print",
 	"log",
 	"echo",
-	"gettable",
-	"createtable",
-	"inherit",
 	"setActorValue",
 	"getActorValue",
 	"showVariable",
+	"include",
+	"getActor",
+	"cmd",
 
 	-- Motion
 	"move",
@@ -59,6 +61,7 @@ local s_env_methods = {
 	"play",
 	"playLoop",
 	"playSpeed",
+	"playBone",
 	"stop",
 	"scale",
 	"scaleTo",
@@ -66,21 +69,32 @@ local s_env_methods = {
 	"getScale",
 	"focus",
 	"camera",
+	"setMovie",
+	"setMovieProperty",
+	"playMovie",
+	"stopMovie",
 
 	-- Events
 	"registerClickEvent",
 	"registerKeyPressedEvent",
 	"registerAnimationEvent",
 	"registerBroadcastEvent",
+	"registerBlockClickEvent",
+	"registerStopEvent",
 	"broadcast",
 	"broadcastAndWait",
-	
+	"registerNetworkEvent",
+	"broadcastNetworkEvent",
+	"sendNetworkEvent",
+
 	-- Control
 	"wait",
+	"waitUntil",
 	"registerCloneEvent",
 	"clone",
 	"delete",
 	"run",
+	"runForActor",
 	"becomeAgent",
 	"setOutput",
 
@@ -89,6 +103,7 @@ local s_env_methods = {
 	"registerCollisionEvent",
 	"broadcastCollision",
 	"distanceTo",
+	"calculatePushOut",
 	"isKeyPressed",
 	"isMouseDown",
 	"getTimer",
@@ -98,6 +113,7 @@ local s_env_methods = {
 	-- Sound
 	"playNote",
 	"playSound",
+	"stopSound",
 	"playMusic",
 }
 local GameLogic = commonlib.gettable("MyCompany.Aries.Game.GameLogic")
@@ -135,7 +151,7 @@ end
 -- @param bExitOnError: if true, this function will handle error 
 -- @return err, msg: err is true if there is error. 
 function env_imp:yield(bExitOnError)
-	local err, msg;
+	local err, msg, p3, p4;
 	if(self.co) then
 		if(self.fake_resume_res) then
 			err, msg = unpack(self.fake_resume_res);
@@ -143,27 +159,27 @@ function env_imp:yield(bExitOnError)
 			return err, msg;
 		else
 			self.check_count = 0;
-			err, msg = self.co:Yield();
+			err, msg, p3, p4 = self.co:Yield();
 			if(err and bExitOnError) then
 				env_imp.exit(self);
 			end
 		end
 	end
-	return err, msg;
+	return err, msg, p3, p4;
 end
 
 -- resume from where jobs are paused last. 
 -- @param err: if there is error, this is true, otherwise it is nil.
 -- @param msg: error message in case err=true
-function env_imp:resume(err, msg)
+function env_imp:resume(err, msg, p3, p4)
 	if(self.co) then
 		if(self.co:GetStatus() == "running") then
-			self.fake_resume_res = {err, msg};
+			self.fake_resume_res = {err, msg, p3, p4};
 			return;
 		else
 			self.fake_resume_res = nil;
 		end
-		local res, err, msg = self.co:Resume(err, msg);
+		local res, err, msg = self.co:Resume(err, msg, p3, p4);
 	end
 end
 
@@ -172,22 +188,12 @@ end
 function env_imp:checkyield()
 	self.check_count = self.check_count + 1;
 	if(self.check_count > 100) then
-		env_imp.wait(self, env_imp.GetDefaultTick(self));
+		if(self.codeblock:IsAutoWait()) then
+			env_imp.wait(self, env_imp.GetDefaultTick(self));
+		else
+			self.check_count = 0;
+		end
 	end
-end
-
--- Output a message and terminate all connected code block.
--- @param msg: output this message. usually nil. 
-function env_imp:exit(msg)
-	-- the caller use xpcall with custom error function, so caller will catch it gracefully and end the request
-	self.is_exit_call = true;
-	self.exit_msg = msg;
-	error("_stop_all_");
-end
-
-function env_imp:restart(msg)
-	env_imp.wait(self, 1);
-	error("_restart_all_");
 end
 
 -- private: 
@@ -197,4 +203,3 @@ function env_imp:GetDefaultTick()
 	end
 	return self.default_tick;
 end
-

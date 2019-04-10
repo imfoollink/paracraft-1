@@ -47,6 +47,39 @@ end
 ]]}
 },
 },
+
+{
+	type = "waitUntil", 
+	message0 = L"等待直到%1",
+	arg0 = {
+		{
+			name = "expression",
+			type = "input_value",
+            shadow = { type = "boolean"},
+		},
+	},
+	category = "Control", 
+	helpUrl = "", 
+	canRun = false,
+	previousStatement = true,
+	nextStatement = true,
+	hide_in_toolbox = false,
+	func_description = "repeat wait(0.01) until(%s)",
+	ToNPL = function(self)
+		return string.format('repeat wait(0.01) until(%s)\n', self:getFieldAsString('expression'));
+	end,
+	examples = {{desc = L"每帧检测一次", canRun = true, code = [[
+say("press space key to continue")
+repeat wait(0.01) until(isKeyPressed("space"))
+say("started")
+]]},
+{desc = L"输入为某个变量或表达式", canRun = false, code = [[
+repeat wait(0.01) until(gamestate == "gameStarted")
+repeat wait(0.01) until(current_level == 1)
+]]},
+},
+},
+
 {
 	type = "repeat", 
 	message0 = L"重复%1次",
@@ -154,10 +187,8 @@ end
 	arg0 = {
 		{
 			name = "var",
-			type = "field_variable",
-			variable = "i",
-			variableTypes = {""},
-			text = "key",
+			type = "field_input",
+			text = "i",
 		},
         {
 			name = "start_index",
@@ -201,10 +232,8 @@ end
 	arg0 = {
 		{
 			name = "var",
-			type = "field_variable",
-			variable = "i",
-			variableTypes = {""},
-			text = "key",
+			type = "field_input",
+			text = "i",
 		},
         {
 			name = "start_index",
@@ -246,6 +275,76 @@ for i=1, 10, 1 do
 end
 ]]}},
 },
+
+
+{
+	type = "expression_compare", 
+	message0 = L"%1 %2 %3",
+	arg0 = {
+		{
+			name = "left",
+-- TODO: nested shadow blocks are not supported
+--			type = "input_value",
+--          shadow = { type = "getLocalVariable", value = "status",},
+			type = "field_input",
+			text = "status",
+		},
+		{
+			name = "op",
+			type = "field_dropdown",
+			options = {
+				{ "==", "==" },{ "!=", "!=" },
+			},
+		},
+		{
+			name = "right",
+-- TODO: nested shadow blocks are not supported
+--			type = "input_value",
+--          shadow = { type = "text", value = "start",},
+			type = "field_input",
+			text = "\"start\"",
+		},
+	},
+	hide_in_toolbox = true,
+	output = {type = "field_number",},
+	category = "Control", 
+	helpUrl = "", 
+	canRun = false,
+	func_description = '((%s) %s (%s))',
+	ToNPL = function(self)
+		return string.format('(%s) %s (%s)', self:getFieldAsString('left'), self:getFieldAsString('op'), self:getFieldAsString('right'));
+	end,
+	examples = {{desc = "", canRun = true, code = [[
+]]}},
+},
+
+{
+	type = "wait_until", 
+	message0 = L"等待直到%1为真",
+	arg0 = {
+		{
+			name = "expression",
+			type = "input_value",
+			shadow = { type = "expression_compare", },
+			text = "status == \"start\""
+		},
+    },
+	category = "Control", 
+	helpUrl = "", 
+	canRun = false,
+	previousStatement = true,
+	nextStatement = true,
+	func_description = 'repeat wait() until(%s)',
+	ToNPL = function(self)
+		return string.format('repeat wait() until(%s)\n', self:getFieldAsString('expression'));
+	end,
+	examples = {{desc = "", canRun = true, code = [[
+status = "gameStarted"
+repeat wait() until(status == "gameStarted")
+say("game started")
+]]}},
+},
+
 {
 	type = "control_if", 
 	message0 = L"如果%1那么",
@@ -463,6 +562,52 @@ run(function()
     end
 end)
 ]]}},
+},
+
+{
+	type = "runForActor", 
+	message0 = L"执行角色%1代码",
+	message1 = L"%1",
+	arg0 = {
+		{
+			name = "actor",
+			type = "input_value",
+            shadow = { type = "text", value = "myself",},
+			text = "myself", 
+		},
+	},
+	arg1 = {
+		{
+			name = "input",
+			type = "input_statement",
+			text = "",
+		},
+	},
+	category = "Control", 
+	color="#00cc00",
+	helpUrl = "", 
+	canRun = false,
+	previousStatement = true,
+	nextStatement = true,
+	func_description = 'runForActor(%s, function()\\n%send)',
+	ToNPL = function(self)
+		return string.format('runForActor("%s", function()\n    %s\nend)\n', self:getFieldAsString('actor'), self:getFieldAsString('input'));
+	end,
+	examples = {
+	{desc = "", canRun = true, code = [[
+runForActor("myself", function()
+	say("hello", 1)
+end)
+say("world", 1)
+]]},
+{desc = "", canRun = true, code = [[
+local actor = getActor("myself")
+local x, y, z = runForActor(actor, function()
+    return getPos();
+end)
+say(x..y..z, 1)
+]]},
+},
 },
 
 {

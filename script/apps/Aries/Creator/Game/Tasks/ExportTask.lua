@@ -109,7 +109,7 @@ function Export:Run()
 		if(SelectionManager:GetSelectedBlocks()) then
 			self:ShowPage(true);
 		else
-			GameLogic.AddBBS(nil, L"请先选择物体, Ctrl+左键多次点击场景可选择");
+			_guihelper.MessageBox(L"请先选择物体, Ctrl+左键多次点击场景可选择")
 		end
 	end
 end
@@ -141,6 +141,7 @@ function Export.ExportAsTemplate(id)
 	NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/SelectBlocksTask.lua");
 	local SelectBlocks = commonlib.gettable("MyCompany.Aries.Game.Tasks.SelectBlocks");
 	SelectBlocks.SaveToTemplate();
+	GameLogic.GetFilters():apply_filters("user_event_stat", "model", "exportAsTemplate", 10, nil);
 end
 
 function Export.ExportAsBMax()
@@ -152,6 +153,7 @@ function Export.ExportAsBMax()
 			local bSuccess, filename = GameLogic.RunCommand("savemodel", filename);
 			if(bSuccess and filename) then
 				GameLogic.GetFilters():apply_filters("file_exported", "bmax", filename);
+				GameLogic.GetFilters():apply_filters("user_event_stat", "model", "export.bmax", 10, nil);
 			end
 		end
 	end, nil, nil, "bmax");

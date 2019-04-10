@@ -98,7 +98,28 @@ end
 turnTo(-60)
 wait(1)
 turnTo(0)
-]]}},
+]]},
+{desc = L"三轴旋转", canRun = true, code = [[
+turnTo(0, 0, 45)
+wait(1)
+turnTo(0, 45, 0)
+wait(1)
+turnTo(0, nil, 45)
+]]},
+{desc = "", canRun = true, code = [[
+while(true) do
+    setActorValue("pitch", getActorValue("pitch")+2)
+    say(getActorValue("pitch"))
+    wait()
+end
+]]},
+{desc = "", canRun = true, code = [[
+while(true) do
+    turnTo(nil, nil, getActorValue("roll")+2)
+    wait()
+end
+]]},
+},
 },
 
 {
@@ -110,6 +131,7 @@ turnTo(0)
 			type = "field_dropdown",
 			options = {
 				{ L"鼠标", "mouse-pointer" },
+				{ L"摄影机", "camera" },
 				{ L"最近的玩家", "@p" },
 				{ L"某个角色名", "" },
 			},
@@ -156,7 +178,21 @@ turnTo("@p")
 moveForward(1, 1)
 turnTo("frog")
 moveForward(1, 1)
-]]}},
+]]},
+{desc = L"面向摄影机", canRun = true, code = [[
+while(true) do
+    turnTo("camera")
+    wait(0.01)
+end
+]]},
+{desc = L"面向摄影机", canRun = true, code = [[
+-- camera yaw and pitch
+while(true) do
+    turnTo("camera", "camera")
+    wait(0.01)
+end
+]]}
+},
 },
 {
 	type = "move", 
@@ -279,7 +315,16 @@ say("mouse-pointer", 1)
 moveTo("mouse-pointer")
 say("the frog actor if any", 1)
 moveTo("frog")
-]]}},
+]]},
+{desc = L"瞬移到角色的某个骨骼", canRun = false, code = [[
+-- block position
+moveTo("myActorName")
+-- float position
+moveTo("myActorName::")
+-- bone position
+moveTo("myActorName::bone_name")
+]]}
+},
 },
 {
 	type = "walk", 
@@ -357,6 +402,11 @@ turnTo(0)
 walkForward(1)
 turn(180)
 walkForward(1, 0.5)
+]]},
+{desc = L"恢复默认物理仿真", canRun = true, code = [[
+play(0,1000, true)
+moveForward(1, 0.5)
+walkForward(0)
 ]]}},
 },
 
@@ -486,7 +536,12 @@ end
 	examples = {{desc = "", canRun = true, code = [[
 local x, y, z = getPos()
 setPos(x, y+0.5, z)
-]]}},
+]]},
+{desc = "", canRun = true, code = [[
+local x, y, z = getPos("actorName")
+setPos(x, y+0.5, z)
+]]}
+},
 },
 {
 	type = "setPos", 
@@ -550,7 +605,11 @@ setPos(x, y+0.5, z)
 while(true) do
     say(getFacing())
 end
-]]}},
+]]},
+{desc = "", canRun = true, code = [[
+say(getFacing("someActorName"))
+]]}
+},
 },
 
 };

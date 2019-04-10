@@ -61,7 +61,17 @@ end
 
 -- called every frame
 function Entity:FrameMove(deltaTime)
-	EntityManager.EntityMovable.FrameMove(self, deltaTime);
+	if(GameLogic.isRemote) then
+		EntityManager.EntityMovable.FrameMove(self, deltaTime);		
+	else
+		local mob = self:UpdatePosition();
+		if(not mob) then
+			return;
+		end
+		if(not self:IsDummy()) then
+			self:MoveEntity(deltaTime);
+		end
+	end
 end
 
 -- called after focus is set
@@ -88,7 +98,7 @@ function Entity:BroadcastCollision()
 	if (entities and #entities > 1) then
 		for i=1, #entities do
 			local entity2 = entities[i];
-			if(entity2 ~= self and self:GetCollisionAABB():Intersect(entity2:GetCollisionAABB())) then
+			if(entity2 ~= self and entity2:IsStaticBlocker() and self:GetCollisionAABB():Intersect(entity2:GetCollisionAABB())) then
 				entity2:collided(self);
 				self:collided(entity2);
 			end

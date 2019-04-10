@@ -20,10 +20,10 @@ end
 <pe:container ClickThrough="true" alignment="_mt" width="0" height="32px" style="position:relative;background:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#497 342 2 32)">
     <pe:container alignment="_lt" style="position:relative;background:;width:600px;height:32px;">
         <pe:if condition='<%=GameLogic.GameMode:IsEditor()%>'>
-            <input type="button" value='<%=L"编辑模式"%>' onclick="DesktopMenuPage.OnClickToggleGameMode" tooltip='<%=L"切换到播放模式(shortcut Ctrl+G)"%>' spacing="5" style="float:left;min-width:70px;height:32px;margin-top:0px" class="mc_button_blue"/>
+            <input type="button" value='<%=L"编辑模式"%>' onclick="DesktopMenuPage.OnClickToggleGameMode" tooltip='<%=L"切换到播放模式(快捷键 Ctrl+G)"%>' spacing="5" style="float:left;min-width:70px;height:32px;margin-top:0px" class="mc_button_blue"/>
         </pe:if>
         <pe:if condition='<%=not GameLogic.GameMode:IsEditor()%>'>
-            <input type="button" value='<%=L"播放模式"%>' onclick="DesktopMenuPage.OnClickToggleGameMode" tooltip='<%=L"切换到编辑模式(shortcut Ctrl+G)"%>' spacing="5" style="float:left;min-width:70px;height:32px;margin-top:0px" class="mc_button_grey"/>
+            <input type="button" value='<%=L"播放模式"%>' onclick="DesktopMenuPage.OnClickToggleGameMode" tooltip='<%=L"切换到编辑模式(快捷键 Ctrl+G)"%>' spacing="5" style="float:left;min-width:70px;height:32px;margin-top:0px" class="mc_button_grey"/>
         </pe:if>
         <pe:repeat DataSource="<%=DesktopMenuPage.GetCurrentMenu()%>">
             <pe:repeatitem style="float:left;">
@@ -32,14 +32,19 @@ end
             </pe:repeatitem>
         </pe:repeat>
     </pe:container>
-    <pe:container alignment="_rt" style="position:relative;width:36px;height:32px;background:;">
-        <div tooltip='<%=L"自动隐藏"%>' name="btnPinMenu" onclick="DesktopMenuPage.TogglePinned" style="padding:2px;width:30px;height:30px;background:;background2:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#428 364 25 26:6 6 6 6);">
-            <pe:if condition='<%=DesktopMenuPage.IsPinned==true%>'>
-                <div zorder="1" style="width:26px;height:27px;background:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#487 62 26 27);" />
-            </pe:if>
-            <pe:if condition='<%=DesktopMenuPage.IsPinned~=true%>'>
-                <div zorder="1" style="width:26px;height:27px;background-color:#808080;background:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#487 62 26 27);" />
-            </pe:if>
+    <pe:container alignment="_rt" style="position:relative;width:200px;height:32px;background:;">
+        <div style="position:relative;">
+            <input type="button" name="projectId" style="height:32px" tooltip='<%=L"点击访问作品项目页面"%>' onclick="DesktopMenuPage.OnClickProjectId" value="<%=DesktopMenuPage.GetProjectText()%>" class="mc_button_grey"/>
+        </div>
+        <div style="width:36px;position:relative;" align="right">
+            <div tooltip='<%=L"自动隐藏"%>' name="btnPinMenu" onclick="DesktopMenuPage.TogglePinned" style="padding:2px;width:30px;height:30px;background:;background2:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#428 364 25 26:6 6 6 6);">
+                <pe:if condition='<%=DesktopMenuPage.IsPinned==true%>'>
+                    <div zorder="1" style="width:26px;height:27px;background:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#487 62 26 27);" />
+                </pe:if>
+                <pe:if condition='<%=DesktopMenuPage.IsPinned~=true%>'>
+                    <div zorder="1" style="width:26px;height:27px;background-color:#808080;background:url(Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png#487 62 26 27);" />
+                </pe:if>
+            </div>
         </div>
     </pe:container>
 </pe:container>

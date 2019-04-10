@@ -20,6 +20,7 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeAPI.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeActor.lua");
 local CodeAPI = commonlib.gettable("MyCompany.Aries.Game.Code.CodeAPI");
 local CodeCoroutine = commonlib.inherit(commonlib.gettable("System.Core.ToolBase"), commonlib.gettable("MyCompany.Aries.Game.Code.CodeCoroutine"));
+CodeCoroutine:Signal("finished");
 
 function CodeCoroutine:ctor()
 end
@@ -64,9 +65,11 @@ end
 
 function CodeCoroutine:MakeCallbackFunc(callbackFunc)
 	return function(...)
-		self:SetCurrentCodeContext();
-		if(callbackFunc) then
-			callbackFunc(...);
+		if(not self.isStopped) then
+			self:SetCurrentCodeContext();
+			if(callbackFunc) then
+				callbackFunc(...);
+			end
 		end
 	end
 end
@@ -81,7 +84,7 @@ function CodeCoroutine:SetTimeout(duration, callbackFunc)
 	local timer = self:GetCodeBlock():SetTimeout(duration, function(timer)
 		self:SetCurrentCodeContext()
 		self:RemoveTimer(timer);
-		if(callbackFunc) then
+		if(callbackFunc and not self.isStopped) then
 			callbackFunc(timer);
 		end
 	end);
@@ -106,13 +109,26 @@ function CodeCoroutine:GetStatus()
 	return self.co and coroutine.status(self.co);
 end
 
-function CodeCoroutine:InRunning()
+function CodeCoroutine:IsRunning()
 	return not self.isStopped;
+end
+
+-- the coroutine has finished the last line of its code, but it may not be stopped, since it may still contain valid timers such as playing animations. 
+function CodeCoroutine:IsFinished()
+	return self.isFinished;
+end
+
+function CodeCoroutine:SetFinished()
+	if(not self.isFinished) then
+		self.isFinished = true;
+		self:finished();
+	end
 end
 
 -- when stopped, it can no longer be resumed
 function CodeCoroutine:Stop()
 	self.isStopped = true;
+	self:SetFinished();
 	-- we need to stop the last coroutine timers, before starting a new one. 
 	self:KillAllTimers();
 end
@@ -125,24 +141,36 @@ end
 function CodeCoroutine:Run(msg, onFinishedCallback)
 	self:Stop();
 	self.isStopped = false;
+	self.isFinished = false;
+	self.codeBlock:Connect("beforeStopped", self, self.Stop, "UniqueConnection");
 	if(self.code_func) then
 		self.co = coroutine.create(function()
-			self:RunImp(msg);
-			self.isStopped = true;
+			local result, r2, r3, r4 = self:RunImp(msg);
+			self:SetFinished();
+			self.codeBlock:Disconnect("beforeStopped", self, self.Stop);
 			if(onFinishedCallback) then
-				onFinishedCallback();
+				onFinishedCallback(result, r2, r3, r4);
 			end
-			return nil, "finished";
+			return result, r2, r3, r4;
 		end)
-		self:Resume();
+		local ok, result, r2, r3, r4 = self:Resume();
+		if(ok and self.isFinished) then
+			return result, r2, r3, r4;
+		end
 	end
+end
+
+local lastErrorCallstack = "";
+function CodeCoroutine.handleError(x)
+	lastErrorCallstack = commonlib.debugstack(2, 5, 1);
+	return x;
 end
 
 function CodeCoroutine:RunImp(msg)
 	local code_func = self.code_func;
 	if(code_func) then
 		setfenv(code_func, self:GetCodeBlock():GetCodeEnv());
-		local ok, result = pcall(code_func, msg);
+		local ok, result, r2, r3, r4 = xpcall(code_func, CodeCoroutine.handleError, msg);
 
 		if(not ok) then
 			if(result:match("_stop_all_")) then
@@ -150,19 +178,19 @@ function CodeCoroutine:RunImp(msg)
 			elseif(result:match("_restart_all_")) then
 				self:GetCodeBlock():RestartAll();
 			else
-				LOG.std(nil, "error", "CodeCoroutine", result);
+				LOG.std(nil, "error", "CodeCoroutine", "%s\n%s", result, lastErrorCallstack);
 				local msg = format(L"运行时错误: %s\n在%s", tostring(result), self:GetCodeBlock():GetFilename());
-				self:GetCodeBlock():send_message(msg);
+				self:GetCodeBlock():send_message(msg, "error");
 			end
 		end
-		return result;
+		return result, r2, r3, r4;
 	end
 end
 
-function CodeCoroutine:Resume(err, msg)
+function CodeCoroutine:Resume(err, msg, p3, p4)
 	if(self.co and not self.isStopped) then
 		self:SetCurrentCodeContext();
-		return coroutine.resume(self.co, err, msg);
+		return coroutine.resume(self.co, err, msg, p3, p4);
 	end
 end
 

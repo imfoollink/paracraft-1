@@ -51,7 +51,14 @@ while(true) do
         bounce()
     end
 end
-]]}},
+]]},
+{desc = "", canRun = true, code = [[
+local boxActor = getActor("box")
+if(isTouching(boxActor)) then
+    say("touched")
+end
+]]}
+},
 },
 
 {
@@ -186,15 +193,36 @@ cmd("/hide boundingbox")
 	canRun = false,
 	previousStatement = true,
 	nextStatement = true,
-	func_description = 'registerCollisionEvent(%s, function()\\n%send)',
+	func_description = 'registerCollisionEvent(%s, function(actor)\\n%send)',
 	ToNPL = function(self)
-		return string.format('registerCollisionEvent("%s", function()\n%send)\n', self:getFieldAsString('name'), self:getFieldAsString('input'));
+		return string.format('registerCollisionEvent("%s", function(actor)\n%send)\n', self:getFieldAsString('name'), self:getFieldAsString('input'));
 	end,
-	examples = {{desc = "", canRun = true, code = [[
+	examples = {
+	{desc = L"某个角色", canRun = true, code = [[
 broadcastCollision()
-registerCollisionEvent("frog", function()
+registerCollisionEvent("frog", function(actor)
+    local data = actor:GetActorValue("some_data")
 end)
-]]}},
+]]},
+
+{desc = L"任意角色", canRun = true, code = [[
+broadcastCollision()
+registerCollisionEvent("", function(actor)
+    local data = actor:GetActorValue("some_data")
+    if(data == 1) then
+        say("collide with 1")
+    end
+end)
+]]},
+
+{desc = L"某个组Id", canRun = true, code = [[
+broadcastCollision()
+setActorValue("groupId", 3);
+registerCollisionEvent(3, function(actor)
+    say("collide with group 3")
+end)
+]]},
+},
 },
 
 {
@@ -247,8 +275,67 @@ while(true) do
     end
     wait(0.01)
 end
-]]}},
+]]},
+{desc = "", canRun = true, code = [[
+if(distanceTo(getActor("box")) < 3) then
+    say("box")
+end
+]]}
 },
+},
+
+{
+	type = "calculatePushOut", 
+	message0 = L"计算物理碰撞距离%1,%2,%3",
+	arg0 = {
+		{
+			name = "dx",
+			type = "input_value",
+			shadow = { type = "math_number", value = 0,},
+			text = 0,
+		},
+		{
+			name = "dy",
+			type = "input_value",
+			shadow = { type = "math_number", value = 0,},
+			text = 0,
+		},
+		{
+			name = "dz",
+			type = "input_value",
+			shadow = { type = "math_number", value = 0,},
+			text = 0,
+		},
+	},
+	output = {type = "field_number",},
+	category = "Sensing", 
+	helpUrl = "", 
+	canRun = false,
+	func_description = 'calculatePushOut(%s, %s, %s)',
+	ToNPL = function(self)
+		return string.format('calculatePushOut(%s, %s, %s)\n', self:getFieldAsString('dx'), self:getFieldAsString('dy'), self:getFieldAsString('dz'));
+	end,
+	examples = {{desc = L"保证不与刚体重叠", canRun = false, code = [[
+while(true) do
+   local dx, dy, dz = calculatePushOut()
+   if(dx~=0 or dy~=0 or dz~=0) then
+      move(dx, dy, dz, 0.1);
+   end
+   wait()
+end
+]]},
+{desc = L"尝试移动一段距离", canRun = false, code = [[
+for i=1, 100 do
+   local dx, dy, dz = calculatePushOut(0.1, 0, 0)
+   if(dx~=0 or dy~=0 or dz~=0) then
+      move(dx, dy, dz, 0.1);
+   end
+   wait()
+end
+]]}
+},
+},
+
 
 {
 	type = "askAndWait", 
@@ -268,7 +355,7 @@ end
 	nextStatement = true,
 	func_description = 'ask(%s)',
 	ToNPL = function(self)
-		return string.format('ask("%s")\n', self:getFieldAsString('input'));
+		return string.format('local result = ask("%s")\n', self:getFieldAsString('input'));
 	end,
 	examples = {{desc = "", canRun = true, code = [[
 ask("what is your name")
@@ -280,6 +367,10 @@ if(answer == 1) then
 elseif(answer == 2) then
     say("you choose B")
 end
+]]},
+{desc = "", canRun = true, code = [[
+local name = ask("what is your name?")
+say("hello "..tostring(name), 2)
 ]]},
 {desc = L"关闭对话框", canRun = true, code = [[
 run(function()
@@ -345,7 +436,7 @@ end
 	canRun = false,
 	func_description = 'isKeyPressed("%s")',
 	ToNPL = function(self)
-		return string.format('isKeyPressed("%s")\n', self:getFieldAsString('input'));
+		return string.format('isKeyPressed("%s")', self:getFieldAsString('input'));
 	end,
 	examples = {{desc = "", canRun = true, code = [[
 say("press left/right key to move me!")
@@ -388,7 +479,7 @@ end
 	canRun = false,
 	func_description = 'isMouseDown()',
 	ToNPL = function(self)
-		return string.format('isMouseDown()\n');
+		return string.format('isMouseDown()');
 	end,
 	examples = {{desc = L"点击任意位置传送", canRun = true, code = [[
 say("click anywhere")
@@ -416,7 +507,7 @@ end
 	end,
 	examples = {{desc = L"点击任意位置传送", canRun = true, code = [[
 while(true) do
-    local x, y, z, blockid = mousePickBlock();
+    local x, y, z, blockid, side = mousePickBlock();
     if(x) then
         say(format("%s %s %s :%d", x, y, z, blockid))
     end
@@ -425,7 +516,7 @@ end
 },
 {
 	type = "getBlock", 
-	message0 = L"获取方块id%1 %2 %3",
+	message0 = L"获取方块%1 %2 %3",
 	arg0 = {
 		{
 			name = "x",
@@ -461,13 +552,28 @@ end
 	canRun = false,
 	func_description = 'getBlock(%s, %s, %s)',
 	ToNPL = function(self)
-		return string.format('getBlock(%s, %s, %s)\n', self:getFieldAsString('x'), self:getFieldAsString('y'), self:getFieldAsString('z'));
+		return string.format('getBlock(%s, %s, %s)', self:getFieldAsString('x'), self:getFieldAsString('y'), self:getFieldAsString('z'));
 	end,
 	examples = {{desc = "", canRun = true, code = [[
 local x,y,z = getPos();
 local id = getBlock(x,y-1,z)
 say("block below is "..id, 2)
-]]}},
+]]},
+{desc = L"获取方块的Data数据", canRun = true, code = [[
+local x,y,z = getPos();
+local id, data = getBlock(x,y-1,z)
+]]},
+{desc = L"获取方块的Entity数据", canRun = true, code = [[
+local x,y,z = getPos();
+local entity = getBlockEntity(x,y,z)
+if(entity) then
+    say(entity.class_name, 1)
+    if(entity.class_name == "EntityBlockModel") then
+        say(entity:GetModelFile())
+    end
+end
+]]},
+},
 },
 
 {

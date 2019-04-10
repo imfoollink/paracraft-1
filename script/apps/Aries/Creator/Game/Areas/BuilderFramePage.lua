@@ -38,10 +38,9 @@ BuilderFramePage.category_ds_old = {
 }
 
 BuilderFramePage.category_ds_new = {
-    {text=L"方块", name="static",     enabled=true},
-    -- {text=L"自然", name="nature",     enabled=true},
-	{text=L"电影", name="movie",     enabled=true},
-    {text=L"人物", name="character",  enabled=true},
+    {text=L"建造", name="static",     enabled=true},
+    {text=L"电影", name="movie",     enabled=true},
+    {text=L"代码", name="character",  enabled=true},
     {text=L"背包", name="playerbag",     enabled=true},
     {text=L"机关", name="gear",	     enabled=true},
     {text=L"装饰", name="deco",       enabled=true},
@@ -99,6 +98,12 @@ end
 
 -- clicked a block item
 function BuilderFramePage.OnClickBlock(block_id_or_item)
+	if type(block_id_or_item) == "table" then
+		GameLogic.GetFilters():apply_filters("user_event_stat", "tool", "pick:"..tostring(block_id_or_item.block_id), 1, nil);
+	else
+		GameLogic.GetFilters():apply_filters("user_event_stat", "tool", "pick:"..tostring(block_id_or_item), 1, nil);
+	end
+
 	local search_text_obj = ParaUI.GetUIObject("block_search_text_obj");
 	if(search_text_obj:IsValid())then
 		search_text_obj:LostFocus();
@@ -114,6 +119,13 @@ function BuilderFramePage.OnClickBlock(block_id_or_item)
 			item:OnClick();
 		end
 	end
+end
+
+-- right click a block item, show help
+function BuilderFramePage.OnHelpBlock(block_id)
+	GameLogic.GetFilters():apply_filters("user_event_stat", "help", "browse:"..tostring(block_id), 2, nil);
+
+	GameLogic.RunCommand("/wiki "..tostring(block_id));
 end
 
 -- @param bRefreshPage: false to stop refreshing the page

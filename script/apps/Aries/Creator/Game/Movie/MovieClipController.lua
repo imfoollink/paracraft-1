@@ -204,6 +204,10 @@ function MovieClipController.ShowPage(bShow, OnClose)
 	end
 
 	MovieClipController.SetFocusToActor();
+
+	if MovieClipController.IsPlayingMode() then
+		GameLogic.GetFilters():apply_filters("user_event_stat", "movie", "play", nil, nil);
+	end
 end
 
 
@@ -276,6 +280,8 @@ end
 function MovieClipController.OnClickAddNPC()
 	local movieClip = MovieClipController.GetMovieClip();
 	if(movieClip) then
+		GameLogic.GetFilters():apply_filters("user_event_stat", "actor", "addNPC", 2, nil);
+
 		local itemStack = movieClip:CreateNPC();
 		if(itemStack) then
 			MovieClipController.SetFocusToItemStack(itemStack);
@@ -583,14 +589,14 @@ end
 function MovieClipController.OnSettings()
 	local movieClip = MovieClipController.GetMovieClip();
 	if(movieClip) then
-		local focus = movieClip:GetFocus();
-		if(focus) then
+		local selectedActor = movieClip:GetSelectedActor();
+		if(selectedActor) then
 			-- select me to edit. 
-			--focus:SelectMe();
-			if focus:GetEntity() and MovieClipController.GetMovieActor() then
+			-- selectedActor:SelectMe();
+			if selectedActor:GetEntity() and MovieClipController.GetMovieActor() then
 				NPL.load("(gl)script/Truck/Game/UI/UIManager.lua");
 				local UIManager= commonlib.gettable("Mod.Truck.Game.UI.UIManager");
-				UIManager.createUI("NPCeditor",UIManager.getUI("UIMain"),nil,{mEntity=focus:GetEntity(),mActor=MovieClipController.GetMovieActor()});
+				UIManager.createUI("NPCeditor",UIManager.getUI("UIMain"),nil,{mEntity=selectedActor:GetEntity(),mActor=MovieClipController.GetMovieActor()});
 			end
 		else
 			local entity = movieClip:GetEntity();

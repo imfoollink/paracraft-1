@@ -25,7 +25,9 @@ end
 function env_imp:delete()
 	if(self.actor) then
 		self.actor:DeleteThisActor();
-		self.actor = nil;
+		if(self.co) then
+			self.co:SetActor(nil);
+		end
 	end
 	env_imp.checkyield(self);
 end
@@ -35,6 +37,7 @@ function env_imp:registerCloneEvent(callbackFunc)
 	env_imp.checkyield(self);
 end
 
+-- @param text: any text, there is some predefined values, like "onCodeBlockStopped"
 function env_imp:registerBroadcastEvent(text, callbackFunc)
 	self.codeblock:RegisterTextEvent(text, callbackFunc);
 	env_imp.checkyield(self);
@@ -70,8 +73,16 @@ function env_imp:registerStartEvent(callbackFunc)
 	self.codeblock:RegisterTextEvent("start", callbackFunc);
 end
 
+function env_imp:registerStopEvent(callbackFunc)
+	self.codeblock:RegisterStopEvent(callbackFunc);
+end
+
 function env_imp:registerClickEvent(callbackFunc)
 	self.codeblock:RegisterClickEvent(callbackFunc);
+end
+
+function env_imp:registerBlockClickEvent(blockid, callbackFunc)
+	self.codeblock:RegisterBlockClickEvent(blockid, callbackFunc);
 end
 
 function env_imp:registerKeyPressedEvent(keyname, callbackFunc)
@@ -82,16 +93,22 @@ function env_imp:registerAnimationEvent(time, callbackFunc)
 	self.codeblock:RegisterAnimationEvent(time, callbackFunc);
 end
 
--- run function in a new coroutine
-function env_imp:run(mainFunc)
-	if(type(mainFunc) == "function") then
-		local co = CodeCoroutine:new():Init(self.codeblock);
-		co:SetActor(self.actor);
-		co:SetFunction(mainFunc);
-		co:Run();	
-	end
+function env_imp:broadcastNetworkEvent(event_name, msg)
+	self.codeblock:BroadcastNetworkEvent(event_name, msg);
 end
 
+function env_imp:registerNetworkEvent(event_name, callbackFunc)
+	self.codeblock:RegisterNetworkEvent(event_name, callbackFunc);
+end
 
+function env_imp:sendNetworkEvent(username, event_name, msg)
+	self.codeblock:SendNetworkEvent(username, event_name, msg);
+end
+
+-- @param cmd: full commands or just command name
+-- @param params: parameters or nil. 
+function env_imp:cmd(cmd, params)
+	self.codeblock:RunCommand(cmd, params)
+end
 
 

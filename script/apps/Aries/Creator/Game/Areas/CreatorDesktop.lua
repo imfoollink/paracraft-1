@@ -226,6 +226,8 @@ function CreatorDesktop.ShowNewPage(IsExpanded)
 				collectgarbage("collect");
 			end
 		else
+			GameLogic.GetFilters():apply_filters("user_event_stat", "tool", "browse", 1, nil);
+
 			IsExpanded = true;
 		end
 	end
@@ -265,7 +267,7 @@ function CreatorDesktop.ShowNewPage(IsExpanded)
 				align = "_ctr",
 				x = 0,
 				y = 0,
-				width = 257,
+				width = 240,
 				height = 480,
 		};
 	CreatorDesktop.new_page_params.bShow = IsExpanded;

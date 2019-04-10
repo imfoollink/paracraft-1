@@ -29,6 +29,9 @@ local function getActor_(actor, objName)
 end
 
 local function getActorEntity_(actor, objName)
+	if(objName == "@p") then
+		return EntityManager.GetPlayer();
+	end
 	actor = getActor_(actor, objName);
 	if(actor) then
 		return actor:GetEntity();
@@ -36,7 +39,7 @@ local function getActorEntity_(actor, objName)
 end
 
 
--- @param objName: another actor name, if there are multiple instances of the same actor, any collision will return true
+-- @param objName: another actor name or actor object, if there are multiple instances of the same actor, any collision will return true
 --  "@a" means nearby players. 
 --  "block" or nil means scene blocks. if number string like "62", it means given block id. 
 -- @return false if actor is not touching another object. Or return the side on which the actor is touching
@@ -52,39 +55,47 @@ function env_imp:isTouching(objName)
 --			return true;
 --		end
 --	end
-
 	local entity = env_imp.GetEntity(self);
 	if(entity) then
-		if(objName==nil or objName == "block") then
+		if(objName==nil) then
 			return actor:IsTouchingBlock();
-		elseif(objName == "@a") then
-			return actor:IsTouchingPlayers();
-		elseif(type(objName)=="number" or objName:match("^%d+$")) then
-			local blockId = tonumber(objName);
-			return actor:IsTouchingBlock(blockId);
-		else
-			return actor:IsTouchingActorByName(objName);	
+		elseif(type(objName) == "string") then
+			if(objName == "@a") then
+				return actor:IsTouchingPlayers();
+			elseif(objName == "block") then
+				return actor:IsTouchingBlock();
+			elseif(objName:match("^%d+$")) then
+				local blockId = tonumber(objName);
+				return actor:IsTouchingBlock(blockId);
+			else
+				return actor:IsTouchingActorByName(objName);	
+			end
+		elseif(type(objName) == "number") then
+			return actor:IsTouchingBlock(objName);
+		elseif(type(objName) == "table" and objName.GetEntity) then
+			return actor:IsTouchingEntity(objName:GetEntity());
 		end
 	end
 end
 
+
 -- @param objName: another actor name, or "mouse-pointer", or "@p" for current player
+-- @return in block coordinate
 function env_imp:distanceTo(actorName)
 	local actor = self.actor;
 	if(not actor) then
 		return maxDist
 	end
+	local dist = maxDist;
 	if(actorName == "mouse-pointer") then
 		local entity = env_imp.GetEntity(self);
 		if(entity) then
 			local result = SelectionManager:MousePickBlock(true, false, false); 
 			if(result and result.blockX) then
 				local x, y, z = BlockEngine:real(result.blockX, result.blockY, result.blockZ);
-				local dist = entity:GetDistanceSq(x,y,z);
-				if(dist > 0.0001) then
-					return math.sqrt(dist);
-				else
-					return dist;
+				dist = entity:GetDistanceSq(x,y,z);
+				if(dist > 0.0000001) then
+					dist = math.sqrt(dist);
 				end
 			end
 		end
@@ -95,21 +106,28 @@ function env_imp:distanceTo(actorName)
 			local entity2 = EntityManager.GetPlayer();
 			if(entity2) then
 				local x, y, z = entity2:GetPosition();
-				local dist = entity:GetDistanceSq(x,y,z);
-				if(dist > 0.0001) then
-					return math.sqrt(dist);
-				else
-					return dist;
+				dist = entity:GetDistanceSq(x,y,z);
+				if(dist > 0.0000001) then
+					dist = math.sqrt(dist);
 				end
 			end
 		end
 	else
-		local actor2 = GameLogic.GetCodeGlobal():GetActorByName(actorName);
+		local actor2;
+		if(type(actorName) == "string") then
+			actor2 = GameLogic.GetCodeGlobal():GetActorByName(actorName);
+		elseif(type(actorName) == "table") then
+			actor2 = actorName;
+		end
+		
 		if(actor2) then
-			return actor:DistanceTo(actor2) or maxDist;
+			dist = actor:DistanceTo(actor2) or maxDist;
 		end
 	end
-	return maxDist;
+	if(dist < maxDist) then
+		dist = BlockEngine:block_float(dist)
+	end
+	return dist;
 end
 
 -- @param keyname: if nil or "any", it means any key, such as "a-z", "space", "return", "escape"
@@ -123,31 +141,62 @@ function env_imp:isMouseDown()
 	return MouseEvent:buttons() == 1;
 end
 
--- get block position X
+-- get block position X (prefer integer, unless not in the center of block)
 -- @param objName: if nil or "self", it means the calling actor
 function env_imp:getX(objName)
 	local actor = self.actor;
 	local entity = getActorEntity_(actor, objName);
 	if(entity) then
 		local bx, by, bz = entity:GetBlockPos();
+		local x, y, z = entity:GetPosition();
+		if(x) then
+			x, y, z = BlockEngine:block_float(x, y, z);
+			x = x - 0.5;
+			if(math.abs(x-bx) < 0.0001) then
+				return bx
+			else
+				return x;
+			end
+		end
 		return bx;
 	end
 end
 
+-- get block position Y (prefer integer, unless not in the center of block)
 function env_imp:getY(objName)
 	local actor = self.actor;
 	local entity = getActorEntity_(actor, objName);
 	if(entity) then
 		local bx, by, bz = entity:GetBlockPos();
+		local x, y, z = entity:GetPosition();
+		if(x) then
+			x, y, z = BlockEngine:block_float(x, y, z);
+			if(math.abs(y-by) < 0.0001) then
+				return by
+			else
+				return y;
+			end
+		end
 		return by;
 	end
 end
 
+-- get block position Z (prefer integer, unless not in the center of block)
 function env_imp:getZ(objName)
 	local actor = self.actor;
 	local entity = getActorEntity_(actor, objName);
 	if(entity) then
 		local bx, by, bz = entity:GetBlockPos();
+		local x, y, z = entity:GetPosition();
+		if(x) then
+			x, y, z = BlockEngine:block_float(x, y, z);
+			z = z - 0.5;
+			if(math.abs(z-bz) < 0.0001) then
+				return bz
+			else
+				return z;
+			end
+		end
 		return bz;
 	end
 end
@@ -182,6 +231,7 @@ end
 -- @param text: string support basic html.  
 -- if nil, it will close the dialog
 -- @param buttons: nil or {"button1", "button2"}
+-- @return result
 function env_imp:ask(text, buttons)
 	local actor = self.actor;
 	if(actor) then
@@ -217,6 +267,7 @@ function env_imp:ask(text, buttons)
 			env_imp.yield(self);
 		end
 		env_imp.wait(self, env_imp.GetDefaultTick(self));
+		return GameLogic.GetCodeGlobal():GetGlobal("answer");
 	end
 end
 
@@ -239,4 +290,18 @@ end
 
 function env_imp:registerCollisionEvent(name, callbackFunc)
 	self.codeblock:RegisterCollisionEvent(name, callbackFunc);
+end
+
+--@param dx,dy,dz: if nil, they default to 0. 
+-- @return dx,dy,dz: return the smallest push out according to current overlapping status 
+function env_imp:calculatePushOut(dx,dy,dz)
+	local actor = self.actor;
+	if(actor) then
+		dx = dx and BlockEngine:block_float(dx);
+		dy = dy and BlockEngine:block_float(dy);
+		dz = dz and BlockEngine:block_float(dz);
+		
+		dx, dy, dz = actor:CalculatePushOut(dx,dy,dz)
+		return BlockEngine:real_min(dx), BlockEngine:real_min(dy), BlockEngine:real_min(dz)
+	end
 end

@@ -116,6 +116,8 @@ function FileDownloader:Start(src, dest, callbackFunc, cachePolicy)
 	if(self.text ~= "official_texture_package") then
 		BroadcastHelper.PushLabel({id=label_id, label = format(L"%s: 正在下载中,请耐心等待", self.text), max_duration=20000, color = "255 0 0", scaling=1.1, bold=true, shadow=true,});
 	end
+	LOG.std(nil, "info", "FileDownloader", "begin download file %s", src or "");
+	
 	local res = ls:GetFile(System.localserver.CachePolicy:new(cachePolicy or "access plus 5 mins"),
 		src,
 		function (entry)
@@ -155,7 +157,9 @@ function FileDownloader:Start(src, dest, callbackFunc, cachePolicy)
 				GameLogic.GetFilters():apply_filters("downloadFile_notify", 1, text);
 			elseif(msg.DownloadState == "terminated") then
 				text = L"下载终止了";
-				OnFail(L"下载终止了");				
+				OnFail(L"下载终止了");
+				LOG.std(nil, "warn", "FileDownloader", "downloading terminated for %s", url);
+				LOG.std(nil, "warn", "FileDownloader", msg);
 				GameLogic.GetFilters():apply_filters("downloadFile_notify", 2, text);
 			end
 			if(text and self.text ~= "official_texture_package") then

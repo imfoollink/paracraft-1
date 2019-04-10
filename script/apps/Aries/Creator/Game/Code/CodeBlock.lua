@@ -6,6 +6,9 @@ Desc: In addition to object oriented programming(oop), paracraft code block feat
 The smallest memory unit is an animation clip over time. So we can also call it animation-oriented programming model. 
 A program is made up of code block, where each code block is associated with one movie block, which contains a short animation
 clip for an actor. Code block exposes a `CodeAPI` that can programmatically control the actor inside the movie block. 
+
+CodeBlock can has unlimited inventory code actors, in addition to the default actor.
+
 use the lib:
 -------------------------------------------------------
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeBlock.lua");
@@ -21,6 +24,11 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeCompiler.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeCoroutine.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeEvent.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeUIActor.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Common/Files.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Code/LanguageConfigurations.lua");
+local LanguageConfigurations = commonlib.gettable("MyCompany.Aries.Game.Code.LanguageConfigurations");
+local CmdParser = commonlib.gettable("MyCompany.Aries.Game.CmdParser");
+local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
 local CodeUIActor = commonlib.gettable("MyCompany.Aries.Game.Code.CodeUIActor");
 local CodeEvent = commonlib.gettable("MyCompany.Aries.Game.Code.CodeEvent");
 local CodeCoroutine = commonlib.gettable("MyCompany.Aries.Game.Code.CodeCoroutine");
@@ -31,10 +39,13 @@ local BlockEngine = commonlib.gettable("MyCompany.Aries.Game.BlockEngine")
 local block_types = commonlib.gettable("MyCompany.Aries.Game.block_types")
 local GameLogic = commonlib.gettable("MyCompany.Aries.Game.GameLogic")
 local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
+local CmdParser = commonlib.gettable("MyCompany.Aries.Game.CmdParser");
 
 local CodeBlock = commonlib.inherit(commonlib.gettable("System.Core.ToolBase"), commonlib.gettable("MyCompany.Aries.Game.Code.CodeBlock"));
 CodeBlock:Property("Name", "CodeBlock");
 CodeBlock:Property({"DefaultTick", 0.02, "GetDefaultTick", "SetDefaultTick", auto=true,});
+CodeBlock:Property({"AutoWait", true, "IsAutoWait", "SetAutoWait", });
+CodeBlock:Property({"modified", false, "IsModified", "SetModified", auto=true});
 
 CodeBlock:Signal("message", function(errMsg) end);
 CodeBlock:Signal("actorClicked", function(actor, mouse_button) end);
@@ -42,6 +53,7 @@ CodeBlock:Signal("actorCloned", function(actor, msg) end);
 CodeBlock:Signal("actorCollided", function(actor, fromActor) end);
 CodeBlock:Signal("codeUnloaded", function() end);
 CodeBlock:Signal("stateChanged", function() end);
+CodeBlock:Signal("beforeStopped", function() end);
 
 function CodeBlock:ctor()
 	self.timers = {};
@@ -49,12 +61,33 @@ function CodeBlock:ctor()
 	self.actors = commonlib.UnorderedArraySet:new();
 	self.events = {};
 	self.startTime = 0;
+	self.bAutoWait = true
 end
 
 function CodeBlock:Init(entityCode)
 	self.entityCode = entityCode;
 	self:AutoSetFilename();
 	return self;
+end
+
+function CodeBlock:SetBlockName(name)
+	if(self.entityCode and self.entityCode:GetDisplayName()~=name) then
+		self.entityCode:SetDisplayName(name);
+	end
+
+	if(self.codename and self.codename~=name) then
+		if(self:IsLoaded()) then
+			-- it is better to reload the code block.
+			self:SetModified(true);
+			GameLogic.GetCodeGlobal():RemoveCodeBlock(self);
+			self.codename = nil;
+			self:AutoSetFilename();
+			GameLogic.GetCodeGlobal():AddCodeBlock(self);
+		else
+			self.codename = nil;
+			self:AutoSetFilename();
+		end
+	end
 end
 
 function CodeBlock:GetBlockName()
@@ -76,6 +109,12 @@ end
 function CodeBlock:Destroy()
 	self:Unload();
 	CodeBlock._super.Destroy(self);
+end
+
+function CodeBlock:GetBlockPos()
+	if(self.entityCode) then
+		return self.entityCode:GetBlockPos();
+	end
 end
 
 -- return the timer object
@@ -112,22 +151,39 @@ function CodeBlock:SetTimeout(duration, callbackFunc)
 	end, duration, nil)
 end
 
+--@param code: the actual code
+--@param filename: virtual filename, if nil, default to GetFilename()
+--@return code_func, errormsg
+function CodeBlock:CompileCodeImp(code, filename)
+	filename = filename or self:GetFilename();
+	local configFile = self:GetEntity():GetLanguageConfigFile()
+	local compileCodeFunc = LanguageConfigurations:GetCompiler(configFile);
+	if(compileCodeFunc) then
+		return compileCodeFunc(code, filename, self)
+	else
+		return CodeCompiler:new():SetFilename(filename):Compile(code);
+	end
+end
+
 -- compile code and reload if code is changed. 
 -- @param code: string
 -- return error message if any
 function CodeBlock:CompileCode(code)
-	if(self.last_code ~= code) then
+	if(self:IsModified() or (self.last_code ~= code or not self.code_func)) then
 		self:Unload();
+		self:SetModified(false);
 		self.last_code = code;
-		self.code_func, self.errormsg = CodeCompiler:new():SetFilename(self:GetFilename()):Compile(code);
+		self.code_func, self.errormsg = self:CompileCodeImp(code);
 		if(not self.code_func and self.errormsg) then
 			LOG.std(nil, "error", "CodeBlock", self.errormsg);
 			local msg = self.errormsg;
 			msg = format(L"编译错误: %s\n在%s", msg, self:GetFilename());
-			self:send_message(msg);
+			self:send_message(msg, "error");
 		else
 			self:send_message(L"编译成功!");
 		end
+	else
+		self:send_message(L"编译成功!");
 	end
 	return self.errormsg;
 end
@@ -169,13 +225,22 @@ function CodeBlock:RestartAll()
 	end
 end
 
+
 -- remove everything to unloaded state. 
 function CodeBlock:Stop()
+	self:beforeStopped();
+
+	self:SetAutoWait(false);
+	self:FireEvent("onCodeBlockStopped", nil, nil, true)
+	self:SetAutoWait(true);
+
+	self:Disconnect("beforeStopped");
 	self:Disconnect("actorClicked");
 	self:Disconnect("actorCloned");
 	self:Disconnect("actorCollided");
 	self:RemoveTimers();
 	self:RemoveAllActors();
+	self.inventoryActors = nil;
 	self:RemoveAllEvents();
 	self:StopLastTempCode();
 	self:SetOutput(0);
@@ -225,6 +290,7 @@ function CodeBlock:RemoveAllActors()
 	
 	self.isRemovingActors = true;
 	for i, actor in ipairs(self:GetActors()) do
+		actor:SetCodeBlock(nil);
 		actor:OnRemove();
 		actor:Destroy();
 	end
@@ -242,6 +308,7 @@ end
 -- private function: do not call this function. 
 function CodeBlock:AddActor(actor)
 	self:GetActors():add(actor);
+	actor:SetCodeBlock(self);
 	actor:Connect("beforeRemoved", self:GetReferencedCodeBlock(), self:GetReferencedCodeBlock().OnRemoveActor);
 	GameLogic.GetCodeGlobal():AddActor(actor);
 end
@@ -352,21 +419,24 @@ function CodeBlock:IsActorPickingEnabled()
 end
 
 -- private: 
-function CodeBlock:CreateFirstActorInMovieBlock()
-	local movie_entity = self:GetMovieEntity();
-	if(movie_entity) then
-		if movie_entity and movie_entity.inventory then
-			for i = 1, movie_entity.inventory:GetSlotCount() do
-				local itemStack = movie_entity.inventory:GetItem(i)
-				if (itemStack and itemStack.count > 0) then
-					if (itemStack.id == block_types.names.TimeSeriesNPC) then
-						return CodeActor:new():Init(itemStack, movie_entity);
-					elseif (itemStack.id == block_types.names.TimeSeriesOverlay) then
-						return CodeUIActor:new():Init(itemStack, movie_entity);
-					end
-				end 
-			end
+-- @param movie_entity: can be nil
+function CodeBlock:CreateFirstActorInMovieBlock(movie_entity)
+	movie_entity = movie_entity or self:GetMovieEntity();
+	if movie_entity and movie_entity.inventory then
+		local actor;
+		for i = 1, movie_entity.inventory:GetSlotCount() do
+			local itemStack = movie_entity.inventory:GetItem(i)
+			if (itemStack and itemStack.count > 0) then
+				if (itemStack.id == block_types.names.TimeSeriesNPC) then
+					actor = CodeActor:new():Init(itemStack, movie_entity, false, "codeblock");
+					break;
+				elseif (itemStack.id == block_types.names.TimeSeriesOverlay) then
+					actor = CodeUIActor:new():Init(itemStack, movie_entity);
+					break;
+				end
+			end 
 		end
+		return actor;
 	end
 end
 
@@ -382,15 +452,163 @@ function CodeBlock:IsLoaded()
 end
 
 -- recompile and run
-function CodeBlock:Restart()
+function CodeBlock:Restart(onFinishedCallback)
 	if(self:GetEntity()) then
 		self:Unload();
-		return self:Run();
+		return self:Run(onFinishedCallback);
+	end
+end
+
+function CodeBlock:GetInventoryActor(slotIndex)
+	return self.inventoryActors and self.inventoryActors[slotIndex];
+end
+
+-- holding a weak reference to the actor
+function CodeBlock:SetInventoryActor(slotIndex, actor)
+	self.inventoryActors = self.inventoryActors or {};
+	self.inventoryActors[slotIndex] = actor;
+end
+
+function CodeBlock:RemoveAllInventoryActors()
+	if(self.inventoryActors) then
+		for slotIndex, actor in pairs(self.inventoryActors) do
+			actor:DeleteThisActor();
+		end
+		self.inventoryActors = nil;
+	end
+end
+
+-- it will refresh real inventory code actors if code block is loaded
+-- otherwise it will refresh inventory movie actors if code block is NOT loaded. 
+-- this function is called automatically when the code block inventory is changed. 
+-- @param slotIndex: if nil, it will refresh all 
+function CodeBlock:RefreshInventoryActor(slotIndex)
+	if(not slotIndex) then
+		if(self:IsLoaded()) then
+			self:RefreshAllInventoryActors()
+		else
+			self:RefreshAllInventoryAsMovieActors()
+		end
+		return 
+	end
+	if(self:IsLoaded()) then
+		local inventory = self:GetEntity():GetInventory()
+		local itemStack = inventory:GetItem(slotIndex);
+		if(itemStack and not self:GetInventoryActor(slotIndex)) then
+			local actor = self:CloneMyself();
+			if(actor) then
+				actor:SetInitParams(itemStack:GetDataTable())
+				actor:ApplyInitParams()
+				self:SetInventoryActor(slotIndex, actor);
+			end
+		elseif(not itemStack) then
+			local actor = self:GetInventoryActor(slotIndex);
+			if(actor) then
+				actor:DeleteThisActor();
+				self:SetInventoryActor(slotIndex, nil);
+			end
+		else
+			local actor = self:GetInventoryActor(slotIndex)
+			actor:ApplyInitParams();
+		end
+	else
+		local inventory = self:GetEntity():GetInventory()
+		local itemStack = inventory:GetItem(slotIndex);
+		if(itemStack and not self:GetInventoryMovieActor(slotIndex)) then
+			local codeActorItem = self:GetEntity():GetCodeActorItemStack(slotIndex);
+			if(codeActorItem) then
+				local actor = codeActorItem:CreateMovieActor();
+				if(actor) then
+					self:SetInventoryMovieActor(slotIndex, actor);
+				end
+			end
+		elseif(not itemStack) then
+			local actor = self:GetInventoryMovieActor(slotIndex);
+			if(actor) then
+				actor:DeleteThisActor();
+				self:GetInventoryMovieActor(slotIndex, nil);
+			end
+		else
+			local actor = self:GetInventoryMovieActor(slotIndex)
+			local codeActorItem = self:GetEntity():GetCodeActorItemStack(slotIndex);
+			if(codeActorItem) then
+				codeActorItem:ApplyInitParams(actor);
+			end
+		end
+	end
+end
+
+function CodeBlock:RefreshAllInventoryActors()
+	if(self:IsLoaded()) then
+		self:RemoveAllInventoryActors();
+		local inventory = self:GetEntity():GetInventory()
+		for slotIndex = 1, inventory:GetSlotCount() do
+			local itemStack = inventory:GetItem(slotIndex)
+			if(itemStack and itemStack.count > 0 and itemStack.serverdata) then
+				local actor = self:CloneMyself();
+				if(actor) then
+					actor:SetInitParams(itemStack:GetDataTable())
+					actor:ApplyInitParams()
+					self:SetInventoryActor(slotIndex, actor);
+				end
+			end
+		end
+	end
+end
+
+function CodeBlock:GetInventoryMovieActor(slotIndex)
+	return self.inventoryMovieActors and self.inventoryMovieActors[slotIndex];
+end
+
+-- holding a weak reference to the actor
+function CodeBlock:SetInventoryMovieActor(slotIndex, actor)
+	self.inventoryMovieActors = self.inventoryMovieActors or {};
+	self.inventoryMovieActors[slotIndex] = actor;
+end
+
+function CodeBlock:RemoveAllInventoryMovieActors()
+	if(self.inventoryMovieActors) then
+		for slotIndex, actor in pairs(self.inventoryMovieActors) do
+			actor:DeleteThisActor();
+		end
+		self.inventoryMovieActors = nil;
+	end
+end
+
+-- this function is used for rendering all instanced inventory actors in editor mode. 
+-- only call this when code block is not loaded, it will show all inventory actors belonging to this code block
+-- this could be inaccurate in turns of rendering, since they are not using any code block logics, but just
+-- using data from movie block and initial params from the inventory's item stack. 
+-- when code block is loaded,  these movie actors will be removed automatically
+function CodeBlock:RefreshAllInventoryAsMovieActors()
+	if(not self:IsLoaded()) then
+		self:RemoveAllInventoryMovieActors();
+		local movieEntity = self:GetMovieEntity();
+		if(movieEntity) then
+			local itemStack = movieEntity:GetFirstActorStack();
+			if(itemStack) then
+				local item = itemStack:GetItem();
+				if(item and item.CreateActorFromItemStack) then
+					local inventory = self:GetEntity():GetInventory()
+					for slotIndex = 1, inventory:GetSlotCount() do
+						local codeActorItem = self:GetEntity():GetCodeActorItemStack(slotIndex);
+						if(codeActorItem) then
+							local actor = codeActorItem:CreateMovieActor();
+							if(actor) then
+								self:SetInventoryMovieActor(slotIndex, actor);
+							end
+						end
+					end
+				end
+			end
+		end
 	end
 end
 
 -- run code again 
-function CodeBlock:Run()
+function CodeBlock:Run(onFinishedCallback)
+	self:GetEntity():ClearIncludedFiles();
+	self:RemoveAllInventoryMovieActors();
 	self:CompileCode(self:GetEntity():GetCommand());
 	if(self.code_func) then
 		self:ResetTime();
@@ -401,13 +619,41 @@ function CodeBlock:Run()
 		local actor = self:FindNearbyActor() or self:CreateActor();
 		co:SetActor(actor);
 		GameLogic.GetCodeGlobal():AddCodeBlock(self);
-		return co:Run();
+		local inventory = self:GetEntity():GetInventory()
+		if(inventory and not inventory:IsEmpty()) then
+			return co:Run(nil, function(...)
+				self:RefreshAllInventoryActors();
+				if(onFinishedCallback) then
+					onFinishedCallback(...)
+				end
+			end);
+		else
+			return co:Run(nil, onFinishedCallback);
+		end
+		
+	else
+		self:ResetTime();
+		self.isLoaded = true;
+		self:stateChanged();
+		local actor = self:FindNearbyActor() or self:CreateActor();
+		self:RefreshAllInventoryActors();
+		GameLogic.GetCodeGlobal():AddCodeBlock(self);
+		return false;
 	end
 end
 
-function CodeBlock:send_message(msg)
+-- @param msg: string
+-- @param msgType: if nil, it is a normal message. 
+-- it can also be "error", if it is error, we will show to user via game console. 
+function CodeBlock:send_message(msg, msgType)
 	self.lastMessage = msg;
 	self:message(msg);
+	if(msgType == "error") then
+		-- LOG.std(nil, "error", "CodeBlock", msg);
+		local date_str, time_str = commonlib.log.GetLogTimeString();
+		local html_text = format("<div style='color:#ff0000'><span style='color:#808080'>%s %s: </span>%s%s<div>", date_str, time_str, commonlib.Encoding.EncodeHTMLInnerText(msg:sub(1, 1024)), ((#msg)>1024) and "..." or "");
+		GameLogic.SetTipText(html_text, nil, 10)
+	end
 end
 
 function CodeBlock:GetLastMessage()
@@ -415,7 +661,7 @@ function CodeBlock:GetLastMessage()
 end
 
 -- @param msg: optional message to be passed to event callback
-function CodeBlock:FireEvent(event_name, actor, msg)
+function CodeBlock:FireEvent(event_name, actor, msg, bIsImmediate)
 	event_name = event_name or "";
 	local events = self.events[event_name];
 	if(events) then
@@ -423,10 +669,11 @@ function CodeBlock:FireEvent(event_name, actor, msg)
 			if(actor) then
 				event:SetActor(actor);
 			end
-			event:Fire(msg);
+			event:Fire(msg, nil, bIsImmediate);
 		end
 	end
 end
+
 
 function CodeBlock:CreateEvent(event_name)
 	event_name = event_name or "";
@@ -466,16 +713,69 @@ function CodeBlock:RegisterClickEvent(callbackFunc)
 	event:SetFunction(callbackFunc);
 end
 
+-- use this sparingly, because we will disable auto yield in this mode. 
+function CodeBlock:RegisterStopEvent(callbackFunc)
+	local event = self:CreateEvent("onCodeBlockStopped");
+	event:SetIsFireForAllActors(true);
+	event:SetFunction(callbackFunc);
+end
+
+-- @param blockname: block id or name, if nil or "any", it matches all blocks
+function CodeBlock:RegisterBlockClickEvent(blockname, callbackFunc)
+	local event = self:CreateEvent("onBlockClicked");
+	event:SetIsFireForAllActors(true);
+	event:SetFunction(callbackFunc);
+
+	local blockid, _;
+	if(type(blockname) == "string" and blockname ~= "any") then
+		blockid, _ = CmdParser.ParseBlockId(blockname);
+	elseif(type(blockname) == "number") then
+		blockid = blockname
+	end
+	
+	local function onEvent_(_, msg)
+		if(not msg) then
+			return 
+		end
+		local bFire;
+		if(not blockid) then
+			bFire = true;
+		elseif(blockid == msg.blockid) then
+			bFire = true;
+		end
+		if(bFire) then
+			event:Fire(msg.param1 or msg);
+			return true;
+		end
+	end
+	event:Connect("beforeDestroyed", function()
+		GameLogic.GetCodeGlobal():UnregisterBlockClickEvent(onEvent_);
+	end)
+	GameLogic.GetCodeGlobal():RegisterBlockClickEvent(onEvent_);
+end
+
 function CodeBlock:OnClickActor(actor, mouse_button)
 	self:FireEvent("onClickActor", actor);
 	self:actorClicked(actor, mouse_button);
 end
 
--- @param keyname: if nil or "any", it means any key, such as "a-z", "space", "return", "escape"
--- case incensitive
+-- we will accept these keys, so that base context does not process them. 
+local nonAcceptingKeys = {
+	["mouse_buttons"] = true, ["mouse_wheel"] = true, ["escape"] = true,
+}
+
+local mouseKeys = {
+	["mouse_buttons"] = true, ["mouse_wheel"] = true
+}
+
+
+-- @param keyname: if nil or "any", it means any key, such as "a-z", "space", "return", "escape", "mouse_wheel", "mouse_buttons"
+-- @param callbackFunc: if keyname is "any", this function will block key if it returns true. 
+-- case insensitive
 function CodeBlock:RegisterKeyPressedEvent(keyname, callbackFunc)
 	local event = self:CreateEvent("onKeyPressed");
 	event:SetIsFireForAllActors(true);
+	event:SetStopLastEvent(false);
 	event:SetFunction(callbackFunc);
 	keyname = GameLogic.GetCodeGlobal():GetKeyNameFromString(keyname) or keyname;
 	
@@ -484,14 +784,21 @@ function CodeBlock:RegisterKeyPressedEvent(keyname, callbackFunc)
 			return 
 		end
 		local bFire;
+		local bImmediateMode;
+		local result;
 		if(not keyname or keyname == "any") then
-			bFire = true;
+			if(not mouseKeys[msg.keyname or ""]) then
+				bFire = true;
+				bImmediateMode = true;
+			end
 		elseif(keyname == msg.keyname) then
+			if(not nonAcceptingKeys[keyname]) then
+				result = true;
+			end
 			bFire = true;
 		end
 		if(bFire) then
-			event:Fire();
-			return true;
+			return event:Fire(msg.param1 or msg, nil, bImmediateMode) or result;
 		end
 	end
 	event:Connect("beforeDestroyed", function()
@@ -526,6 +833,32 @@ function CodeBlock:RegisterCloneActorEvent(callbackFunc)
 	event:SetFunction(callbackFunc);
 end
 
+function CodeBlock:RegisterNetworkEvent(event_name, callbackFunc)
+	local event = self:CreateEvent(event_name);
+	event:SetIsFireForAllActors(true);
+	event:SetFunction(callbackFunc);
+	local function onEvent_(_, msg)
+		event:Fire(msg and msg.msg, msg and msg.onFinishedCallback);
+	end
+	event:Connect("beforeDestroyed", function()
+		GameLogic.GetCodeGlobal():UnregisterNetworkEvent(event_name, onEvent_);
+	end)
+	if(event_name == "connect") then
+		self:Connect("beforeStopped", function()
+			GameLogic.GetCodeGlobal():UnregisterNetworkEvent(event_name, onEvent_, self);
+		end)
+	end
+	GameLogic.GetCodeGlobal():RegisterNetworkEvent(event_name, onEvent_);
+end
+
+function CodeBlock:BroadcastNetworkEvent(event_name, msg)
+	GameLogic.GetCodeGlobal():BroadcastNetworkEvent(event_name, msg);
+end
+
+function CodeBlock:SendNetworkEvent(username, event_name, msg)
+	GameLogic.GetCodeGlobal():SendNetworkEvent(username, event_name, msg);
+end
+
 -- create a clone of some code block's actor
 -- @param name: if nil or "myself", it means clone myself
 -- @param msg: any mesage that is forwared to clone event
@@ -544,10 +877,12 @@ function CodeBlock:GetCodeBlockByName(name)
 	return GameLogic.GetCodeGlobal():GetCodeBlockByName(name);
 end
 
+-- @return the actor created
 function CodeBlock:CloneMyself(msg)
 	local actor = self:CreateActor();
 	if(actor) then
 		self:GetReferencedCodeBlock():OnCloneActor(actor, msg);
+		return actor;
 	end
 end
 
@@ -587,12 +922,12 @@ end
 -- usually from help window. There can only be one temp code running. 
 -- @param code: string
 function CodeBlock:RunTempCode(code, filename)
-	local code_func, errormsg = CodeCompiler:new():SetFilename(filename or "tempcode"):Compile(code);
+	local code_func, errormsg = self:CompileCodeImp(code, filename or "tempcode");
 	if(not code_func and errormsg) then
 		LOG.std(nil, "error", "CodeBlock", errormsg);
 		local msg = errormsg;
 		msg = format(L"编译错误: %s\n在%s", msg, filename);
-		self:send_message(msg);
+		self:send_message(msg, "error");
 	else
 		local env = self:GetCodeEnv();
 		if(env) then
@@ -631,15 +966,25 @@ function CodeBlock:ResetTime()
 end
 
 -- collision event is special that it will not overwrite the last event.
+-- @param name: if nil or "", it matches all actors
+-- if name is a number, it means a physics_group_id
 function CodeBlock:RegisterCollisionEvent(name, callbackFunc)
 	local event = self:CreateEvent("onCollideActor");
 	event:SetIsFireForAllActors(false);
 	event:SetStopLastEvent(false);
-	event:SetCanFireCallback(function(actor, fromActor)
-		if(fromActor and fromActor:GetName() == name) then
-			return true;
-		end
-	end);
+	if(type(name) == "number") then
+		event:SetCanFireCallback(function(actor, fromActor)
+			if(fromActor and (fromActor:GetGroupId() == name)) then
+				return true;
+			end
+		end);
+	else
+		event:SetCanFireCallback(function(actor, fromActor)
+			if(fromActor and (not name or name=="" or fromActor:GetName() == name)) then
+				return true;
+			end
+		end);
+	end
 	event:SetFunction(callbackFunc);
 end
 
@@ -652,5 +997,87 @@ end
 function CodeBlock:SetOutput(result)
 	if(self:GetEntity()) then
 		self:GetEntity():SetLastCommandResult(result);
+	end
+end
+
+local lastErrorCallstack = "";
+function CodeBlock.handleError(x)
+	lastErrorCallstack = commonlib.debugstack(2, 5, 1);
+	return x;
+end
+
+-- @param filename: include a file relative to current world directory
+function CodeBlock:IncludeFile(filename)
+	local filepath = Files.WorldPathToFullPath(filename);
+	if(self:GetEntity()) then
+		self:GetEntity():AddIncludedFile(filename);
+	end
+
+	local file = ParaIO.open(filepath, "r")
+	if(file:IsValid()) then
+		local code = file:GetText();
+		file:close();
+		if(code and code~="") then
+			local code_func, errormsg = self:CompileCodeImp(code, filename);
+			if(not code_func and errormsg) then
+				LOG.std(nil, "error", "CodeBlock", errormsg);
+				local msg = errormsg;
+				msg = format(L"编译错误: %s\n在%s", msg, filename);
+				self:send_message(msg, "error");
+			else
+				setfenv(code_func, self:GetCodeEnv());
+				local ok, result = xpcall(code_func, CodeBlock.handleError);
+				if(not ok) then
+					if(result:match("_stop_all_")) then
+						self:StopAll();
+					elseif(result:match("_restart_all_")) then
+						self:RestartAll();
+					else
+						LOG.std(nil, "error", "CodeBlock", "%s\n%s", result, lastErrorCallstack);
+						local msg = format(L"运行时错误: %s\n在%s", tostring(result), filename);
+						self:send_message(msg, "error");
+					end
+				end
+			end
+		end
+	else
+		LOG.std(nil, "warn", "CodeBlock", "include can not file world file %s", filename);
+		local msg = format(L"没有找到文件: %s", filename);
+		self:send_message(msg, "error");
+	end
+end
+
+function CodeBlock:SetAutoWait(bAutoWait)
+	self.bAutoWait = bAutoWait;
+end
+
+-- whether to automatically wait when a given number of instructions are executed. 
+function CodeBlock:IsAutoWait()
+	return self.bAutoWait;
+end
+
+function CodeBlock:handleAutoWaitCmd(params)
+	local isAutowait = true;
+	if(type(params) == "string") then
+		isAutowait  = CmdParser.ParseBool(params)
+	elseif(type(params) == "boolean") then
+		isAutowait = params
+	end
+	self:SetAutoWait(isAutowait);
+end
+
+local codeBlockCmds = {
+	["autowait"] = CodeBlock.handleAutoWaitCmd
+}
+
+function CodeBlock:RunCommand(cmd_name, cmd_text)
+	if(cmd_text == nil) then
+		cmd_name, cmd_text = cmd_name:match("^/*(%w+)%s*(.*)$");
+	end
+	local handlerFunc = codeBlockCmds[cmd_name or ""];
+	if(handlerFunc) then
+		handlerFunc(self, cmd_text);
+	else
+		return GameLogic.RunCommand(cmd_name, cmd_text);
 	end
 end

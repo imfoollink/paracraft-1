@@ -71,6 +71,9 @@ function ItemClient.PreloadItemClass()
 	NPL.load("(gl)script/apps/Aries/Creator/Game/Items/ItemTerrainBrush.lua");
 	NPL.load("(gl)script/apps/Aries/Creator/Game/Items/ItemPaintBrush.lua");
 	NPL.load("(gl)script/apps/Aries/Creator/Game/Items/ItemLight.lua");
+	NPL.load("(gl)script/apps/Aries/Creator/Game/Items/ItemCodeBlock.lua");
+	NPL.load("(gl)script/apps/Aries/Creator/Game/Items/ItemCodeActor.lua");
+	NPL.load("(gl)script/apps/Aries/Creator/Game/Items/ItemCodeActorInstance.lua");
 
 	GameLogic.GetFilters():apply_filters("register_item");
 end

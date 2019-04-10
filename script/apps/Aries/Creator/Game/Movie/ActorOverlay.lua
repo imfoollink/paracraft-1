@@ -57,7 +57,8 @@ local selectable_var_list = {
 	"text",
 	"code",
 	"pos", -- multiple of x,y,z
- 	"screen_pos", -- multiple of ui_x, ui_y
+ 	"screen_pos", -- multiple of ui_x, ui_y, ui_align
+	"ui_align", -- "center", "top", "bottom"
 	"facing", 
 	"rot", -- multiple of "roll", "pitch", "facing"
 	"scaling", 
@@ -69,6 +70,11 @@ local selectable_var_list = {
 function Actor:ctor()
 	self.codeItem = ItemStack:new():Init(block_types.names.Code, 1);
 	self.m_aabb = ShapeBox:new():SetPointBox(0,0,0);
+end
+
+function Actor:DeleteThisActor()
+	self:OnRemove();
+	self:Destroy();
 end
 
 function Actor:GetMultiVariable()
@@ -156,6 +162,7 @@ function Actor:Init(itemStack, movieclipEntity)
 	timeseries:CreateVariableIfNotExist("z", "Linear");
 	timeseries:CreateVariableIfNotExist("ui_x", "Linear");
 	timeseries:CreateVariableIfNotExist("ui_y", "Linear");
+	timeseries:CreateVariableIfNotExist("ui_align", "Discrete");
 	timeseries:CreateVariableIfNotExist("facing", "LinearAngle");
 	timeseries:CreateVariableIfNotExist("pitch", "LinearAngle");
 	timeseries:CreateVariableIfNotExist("roll", "LinearAngle");
@@ -279,7 +286,7 @@ function Actor:CreateKeyFromUI(keyname, callbackFunc)
 text("hello"); text("line2",0,16);<br/>
 image("1.png", 300, 200);<br/>
 rect(-10,-10,250,64,"1.png;0 0 32 32:8 8 8 8");<br/>
-color("#ff0000");<br/>
+color("#ff0000"); font(14);<br/>
 ]];
 		
 		NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/EnterTextDialog.lua");
@@ -371,10 +378,32 @@ color("#ff0000");<br/>
 				end
 			end
 		end, old_value)
+	elseif(keyname == "ui_align") then
+		local title = format(L"起始时间%s, 请输入UI对齐方式", strTime);
+		title = title.."<br/>center|top|bottom";
+		old_value = self:GetValue("ui_align", curTime) or "center";
+
+		NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/EnterTextDialog.lua");
+		local EnterTextDialog = commonlib.gettable("MyCompany.Aries.Game.GUI.EnterTextDialog");
+		EnterTextDialog.ShowPage(title, function(result)
+			if(result and result~="") then
+				local align = result:match("%w+");
+				if(align == "center" or align == "top"  or align == "bottom") then
+					self:BeginUpdate();
+					self:AddKeyFrameByName("ui_align", nil, align);
+					self:EndUpdate();
+					self:FrameMovePlaying(0);
+					if(callbackFunc) then
+						callbackFunc(true);
+					end
+				end
+			end
+		end, old_value)
 	elseif(keyname == "screen_pos") then
 		local title = format(L"起始时间%s, 请输入位置x,y", strTime);
 		title = title.."<br/>x=[-500,500],y=[-500,500]";
 		old_value = string.format("%d, %d", self:GetValue("ui_x", curTime) or 0,self:GetValue("ui_y", curTime) or 0);
+
 		NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/EnterTextDialog.lua");
 		local EnterTextDialog = commonlib.gettable("MyCompany.Aries.Game.GUI.EnterTextDialog");
 		EnterTextDialog.ShowPage(title, function(result)
@@ -467,6 +496,15 @@ function Actor:ComputeText(curTime)
 	return self:GetValue("text", curTime);
 end
 
+function Actor:ComputeRenderCode(curTime)
+	return self:GetValue("code", curTime);
+end
+
+-- set rendering code
+function Actor:SetRenderCode(code)
+	self.codeItem:SetCode(code);
+end
+
 function Actor:FrameMovePlaying(deltaTime)
 	local curTime = self:GetTime();
 	local entity = self.entity;
@@ -477,22 +515,23 @@ function Actor:FrameMovePlaying(deltaTime)
 	local allow_user_control = self:IsAllowUserControl() and
 		((self:GetMultiVariable():GetLastTime()+1) <= curTime);
 
-	local new_x = self:GetValue("x", curTime);
-	local new_y = self:GetValue("y", curTime);
-	local new_z = self:GetValue("z", curTime);
-
+	local new_x, new_y, new_z, yaw, roll, pitch = self:ComputePosAndRotation(curTime);
+	
 	local ui_x = self:GetValue("ui_x", curTime);
 	local ui_y = self:GetValue("ui_y", curTime);
+	local ui_align = self:GetValue("ui_align", curTime);
 
-	local yaw, roll, pitch, scaling, opacity, color;
-	yaw = self:GetValue("facing", curTime);
-	roll = self:ComputeRoll(curTime);
-	pitch = self:GetValue("pitch", curTime);
+	local scaling, opacity, color;
+	
 	scaling = self:ComputeScaling(curTime);
 	opacity = self:GetValue("opacity", curTime);
 	color = self:ComputeColor(curTime);
 
 	if(ui_x or ui_y) then
+		if(ui_align) then
+			entity:SetAlignment(ui_align);
+		end			
+
 		entity:SetScreenPos(ui_x or 0, ui_y or 0);
 		entity:SetScreenMode(true);
 	else
@@ -519,12 +558,7 @@ function Actor:FrameMovePlaying(deltaTime)
 	
 	entity:SetColor(color or "#ffffff");
 	-- set render code
-	self:SetRenderCode(self:GetValue("code", curTime))
-end
-
--- set rendering code
-function Actor:SetRenderCode(code)
-	self.codeItem:SetCode(code);
+	self:SetRenderCode(self:ComputeRenderCode(curTime))
 end
 
 -- example codes:
@@ -542,23 +576,32 @@ function Actor:CheckInstallCodeEnv(painter, isPickingPass)
 		-- draw text
 		-- @param text: text to render with current font 
 		-- @param x,y: default to 0,0
-		env.text = function(text, x, y)
+		-- @param width, height: can be nil, unless you want to center the text
+		-- @param alignment: only used when width is not nil
+		env.text = function(text, x, y, width, height, alignment)
 			if(text and text~="" ) then
 				x = x or 0;
 				y = y or 0;
 									
 				if(not env.isPickingPass) then
 					self:ExtendAABB(x, y);
-					for line in text:gmatch("[^\n]+") do
-						env.painter:DrawText(x, y, line);
-						y = y + self.lineheight;
-						self:ExtendAABB(x + _guihelper.GetTextWidth(line, self:GetFont()), y);
+					if(not width or not height) then
+						for line in text:gmatch("[^\n]+") do
+							env.painter:DrawText(x, y, line);
+							y = y + self.lineheight;
+							self:ExtendAABB(x + _guihelper.GetTextWidth(line, self:GetFont()), y);
+						end
+					else
+						alignment = alignment or 0x00000105; 
+						env.painter:DrawText(x, y, width, height, text, alignment);
 					end
 				else
-					local width, height = 0,0;
-					for line in text:gmatch("[^\n]+") do
-						height = height + self.lineheight;
-						width = math.max(width, _guihelper.GetTextWidth(line, self:GetFont()))
+					if(not width) then
+						width, height = 0,0;
+						for line in text:gmatch("[^\n]+") do
+							height = height + self.lineheight;
+							width = math.max(width, _guihelper.GetTextWidth(line, self:GetFont()))
+						end
 					end
 					if(width~=0 and height~=0) then
 						env.painter:DrawRect(x,y, width, height);
@@ -594,6 +637,19 @@ function Actor:CheckInstallCodeEnv(painter, isPickingPass)
 		env.color = function(color)
 			if(not env.isPickingPass) then
 				env.painter:SetPen(color);
+			end
+		end
+
+		-- set font 
+		-- @param font: font_size
+		-- or {family="System", size=10, bold=true}
+		-- or it can be string "System;14;" or "System;14;bold"
+		env.font = function(font)
+			if(not env.isPickingPass) then
+				if(type(font) == "number") then
+					font = "System;"..font;
+				end
+				env.painter:SetFont(font);
 			end
 		end
 
@@ -760,7 +816,7 @@ function Actor:ComputePosAndRotation(curTime)
 	local new_y = self:GetValue("y", curTime);
 	local new_z = self:GetValue("z", curTime);
 	local yaw = self:GetValue("facing", curTime);
-	local roll = self:GetValue("roll", curTime);
+	local roll = self:ComputeRoll(curTime);
 	local pitch = self:GetValue("pitch", curTime);
 
 	return new_x, new_y, new_z, yaw, roll, pitch;

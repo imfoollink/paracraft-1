@@ -78,8 +78,9 @@ local block_attribute_map = {
 	onload			= 0x0040000, -- whether has onBlockLoaded
 	color_data		= 0x0080000, -- whether the block contains color in its block data.
 	invisible		= 0x0100000, -- whether the block is invisible.
-	tiling			= 0x0200000, -- whether tiling is used
+	random_tiling		= 0x0200000, -- whether the block's texture is randomly fetched from its tiled texture
 	color8_data		= 0x0400000, -- whether the block uses only the high 8 bits as color in its block data.
+	pos_tiling		= 0x0800000, -- whether the block's texture is fetched from its tiled texture according to its coords
 }
 
 block.attributes = block_attribute_map;
@@ -1249,26 +1250,6 @@ function block:GetItem()
 	return ItemClient.GetItem(self.id);
 end
 
--- it may return nil or number like 0xffff0000
-function block:GetDiffuseColor(blockX, blockY, blockZ)
-	if(self.color8_data or self.color_data) then
-		local item = self:GetItem();
-		if(item) then
-			return item:DataToColor(BlockEngine:GetBlockData(blockX, blockY, blockZ) or 0) + 0xff000000;
-		end
-	end
-end
-
--- it may return nil or number like 0xffff0000
-function block:GetDiffuseColorByData(block_data)
-	if(self.color8_data or self.color_data) then
-		local item = self:GetItem();
-		if(item) then
-			return item:DataToColor(block_data or 0) + 0xff000000;
-		end
-	end
-end
-
 -- @param granularity: (0-1), 1 will generate 27 pieces, 0 will generate 0 pieces, default to 1. 
 -- @param cx, cy, cz: center of break point. 
 -- @param color: nil or such as 0xffff0000
@@ -1378,7 +1359,7 @@ end
 -- call when use press mouse down button over the block
 function block:OnMouseDown(x,y,z, mouse_button)
 	if(mouse_button == "left") then
-		self:play_step_sound();
+		-- self:play_step_sound();
 	end
 end
 
@@ -1588,6 +1569,32 @@ function block:MirrorBlockData(blockData, axis)
 	return blockData;
 end
 
+function block:HasColorData()
+	if (self.color8_data or self.color_data) then
+		return true;
+	end
+end
+
+-- it may return nil or number like 0xffff0000
+function block:GetDiffuseColor(blockX, blockY, blockZ)
+	if(self.color8_data or self.color_data) then
+		local item = self:GetItem();
+		if(item) then
+			return item:DataToColor(BlockEngine:GetBlockData(blockX, blockY, blockZ) or 0) + 0xff000000;
+		end
+	end
+end
+
+-- it may return nil or number like 0xffff0000
+function block:GetDiffuseColorByData(block_data)
+	if(self.color8_data or self.color_data) then
+		local item = self:GetItem();
+		if(item) then
+			return item:DataToColor(block_data or 0) + 0xff000000;
+		end
+	end
+end
+
 -- return color in RGB, without alpha
 function block:GetBlockColor(x,y,z)
 	local color; 
@@ -1601,6 +1608,16 @@ function block:GetBlockColor(x,y,z)
 	end
 	color = Color.ToValue(color);
 	return color;
+end
+
+-- @param color: like 0xff0000
+function block:SetBlockColor(x,y,z, color)
+	if(self:HasColorData()) then
+		local item = self:GetItem();
+		if(item and item.PaintBlock) then
+			return item:PaintBlock(x,y,z, color)
+		end
+	end
 end
 
 -- return color in RGB, without alpha
@@ -1631,4 +1648,22 @@ function block:CalculatePreferredData(data, preferredData)
 		end
 	end
 	return data;
+end
+
+-- NOT SUPPORTED in C++ YET: whether the block is obstructed
+function block:SetObstruction(bEnabled)
+	self.obstruction = bEnabled;
+	self:UpdateAttribute("attrFlag", self:RecomputeAttribute());
+end
+
+-- NOT SUPPORTED in C++ YET: 
+function block:SetBlockCamera(bEnabled)
+	self.blockcamera = bEnabled;
+	self:UpdateAttribute("attrFlag", self:RecomputeAttribute());
+end
+
+-- NOT SUPPORTED in C++ YET: 
+function block:SetClimbable(climbable)
+	self.climbable = climbable;
+	self:UpdateAttribute("attrFlag", self:RecomputeAttribute());
 end

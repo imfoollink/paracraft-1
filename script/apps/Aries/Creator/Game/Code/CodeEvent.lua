@@ -87,15 +87,15 @@ end
 
 function CodeEvent:IsRunningForActor(actor)
 	if(actor) then
-		return actor:InRunningEvent(self);
+		return actor:IsRunningEvent(self);
 	else
 		if(self.last_coroutine) then
-			return self.last_coroutine:IsRunning();
+			return not self.last_coroutine:IsFinished();
 		end
 	end
 end
 
-function CodeEvent:FireForActor(actor, msg, onFinishedCallback)
+function CodeEvent:FireForActor(actor, msg, onFinishedCallback, bIsImmediate)
 	if(not self:CanFire(actor, msg)) then
 		if(onFinishedCallback) then
 			onFinishedCallback();
@@ -114,26 +114,32 @@ function CodeEvent:FireForActor(actor, msg, onFinishedCallback)
 	co:SetActor(actor);
 	co:SetFunction(self.callbackFunc);
 	self:SetCodeEvent(actor, co);
-	co:SetTimeout(self:GetCodeBlock():GetDefaultTick(), function()
-		co:Run(msg, onFinishedCallback);
-	end)
+	if(not bIsImmediate) then
+		co:SetTimeout(self:GetCodeBlock():GetDefaultTick(), function()
+			co:Run(msg, onFinishedCallback);
+		end)
+	else
+		return co:Run(msg, onFinishedCallback);
+	end
 end
 
-function CodeEvent:Fire(msg, onFinishedCallback)
+-- @return result if it is available
+function CodeEvent:Fire(msg, onFinishedCallback, bIsImmediate)
 	if(not self.isFireForAll) then
-		self:FireForActor(self.actor, msg, onFinishedCallback);
+		return self:FireForActor(self.actor, msg, onFinishedCallback, bIsImmediate);
 	else
 		local actors = self:GetCodeBlock():GetActors();
 		local nAgentCount = actors and (#actors) or 0;
+		
 		if(nAgentCount > 0) then
-			
+			local result;
 			if(onFinishedCallback) then
 				local finishedCount = 0;
 				local oldFinishedCallback = onFinishedCallback;
 				onFinishedCallback = function()
 					finishedCount = finishedCount + 1;
 					if(finishedCount == nAgentCount) then
-						oldFinishedCallback();
+						oldFinishedCallback(result);
 					end
 				end
 			end				
@@ -141,11 +147,12 @@ function CodeEvent:Fire(msg, onFinishedCallback)
 			for i=nAgentCount, 1, -1  do
 				local actor = actors[i];
 				if(actor) then
-					self:FireForActor(actor, msg, onFinishedCallback);
+					result = self:FireForActor(actor, msg, onFinishedCallback, bIsImmediate) or result;
 				end
 			end
+			return result;
 		else
-			self:FireForActor(self.actor, msg, onFinishedCallback);
+			return self:FireForActor(self.actor, msg, onFinishedCallback, bIsImmediate);
 		end
 	end
 end

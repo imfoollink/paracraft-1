@@ -168,6 +168,14 @@ function GameLogic:ctor()
     if(System.options.mc) then
         -- do not leak events to hook chain. 
         SceneContextManager:SetAcceptAllEvents(true);
+	end
+
+	ParaWorldAnalytics = ParaWorldAnalytics or NPL.load("(gl)script/apps/Aries/Creator/Game/Login/ParaWorldAnalytics.lua");
+	if(ParaWorldAnalytics) then
+		GameLogic:GetFilters():add_filter("user_event_stat", function(category, action, value, label)
+			ParaWorldAnalytics:Send(category, action, value, label);
+			return catetory;
+		end)
     end
 end
 
@@ -301,6 +309,13 @@ function GameLogic.Init(worldObj)
 
     GameLogic.Pause();
 
+	local bEnableGlobalTerrain = WorldCommon.GetWorldTag("global_terrain") == "true";
+	local attr = ParaTerrain.GetAttributeObject()
+	if(attr:GetField("EnableTerrain", true) ~= bEnableGlobalTerrain) then
+		attr:SetField("EnableTerrain", bEnableGlobalTerrain)
+		attr:SetField("RenderTerrain", bEnableGlobalTerrain)
+	end
+
     BlockEngine:Connect();
     BlockEngine:SetGameLogic(GameLogic);
     GameLogic.SetBlockWorld(ParaBlockWorld.GetWorld(""));
@@ -424,6 +439,7 @@ end
 -- set cody's text
 -- @param text: any HTML text
 -- @param target: nil or "<player>"
+-- @param duration: in seconds
 function GameLogic.SetTipText(text, target, duration)
     GameLogic.GetTeacherAgent():ShowTipText(text, duration);
     GameLogic.GetTeacherAgent():ShowTipOnTarget(target, text, duration)
@@ -533,6 +549,10 @@ end
 function GameLogic.LoadGame()
     NPL.load("(gl)script/Truck/SystemSettingsPage.lua");
 
+	NPL.load("(gl)script/apps/Aries/Creator/Game/Common/Files.lua");
+	local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
+	Files:ClearFindFileCache();
+
     GameLogic.current_worlddir = ParaWorld.GetWorldDirectory();
     -- GameLogic.script_dir = GameLogic.current_worlddir.."script/blocks/";
 
@@ -574,8 +594,12 @@ function GameLogic.LoadGame()
     end
     
     ModManager:OnWorldLoad();
+	GameLogic:WorldLoaded()
     GameLogic.GetFilters():apply_filters("OnWorldLoaded");
     
+    local worldname = GameLogic.GetWorldDirectory():match("([^/\\]+)$")
+    GameLogic.GetFilters():apply_filters("user_event_stat", "world", "enter:"..tostring(worldname), 3, nil);
+
     local SystemSettingsPage = commonlib.gettable("Mod.Truck.UI.SystemSettingsPage");
     --SystemSettingsPage.ChangeSkyBox();
     SystemSettingsPage.setting_ds["render_dist"]=MyCompany.Aries.Player.LoadLocalData("Paracraft_System_Render_Distance",150,true);
@@ -590,7 +614,7 @@ function GameLogic.LoadGame()
     local CameraController = commonlib.gettable("MyCompany.Aries.Game.CameraController")
     local value = MyCompany.Aries.Player.LoadLocalData("SystemSettingsPage_Fov",1.04,true)
     CameraController.AnimateFieldOfView(value, nil);
-    
+
     NPL.load("(gl)script/Truck/Utility/GlobalMessageDispatcher.lua");
     local GlobalMessageDispatcher=commonlib.gettable("Mod.Truck.Utility.GlobalMessageDispatcher");
     GlobalMessageDispatcher.getMessageSource():notify(GlobalMessageDispatcher.getMessage_ShaderLevelChange(),SystemSettingsPage.setting_ds["emulational_lighting_value"]);
@@ -693,6 +717,7 @@ end
 function GameLogic.GetUnSavedTime()
     
 end
+
 -- @param bSaveToLastSaveFolder: whether to save block to "blockworld.lastsave" folder
 function GameLogic.SaveAll(bSaveToLastSaveFolder,saveCallBack)
 
@@ -711,6 +736,16 @@ function GameLogic.SaveAll(bSaveToLastSaveFolder,saveCallBack)
         GameLogic.profile:SaveToDB();
     end
     ParaTerrain.SaveBlockWorld(bSaveToLastSaveFolder==true);
+	if( System.options.mc ) then
+		if(ParaTerrain.GetAttributeObject():GetField("EnableTerrain", true)) then
+			WorldCommon.SetWorldTag("global_terrain", true);
+			if(ParaTerrain.IsModified()) then
+				ParaTerrain.SaveTerrain(true,true);
+			end
+		else
+			WorldCommon.SetWorldTag("global_terrain", nil);
+		end
+	end
     
     autotips.Show(false);
     WorldCommon.SaveWorld();
@@ -788,6 +823,7 @@ end
 
 function GameLogic.Exit()
     GameLogic.IsStarted = false;
+	GameLogic.SetTipText(nil);
     local playerController = GameLogic.GetPlayerController();
     if(playerController) then
         playerController:DeselectMainPlayerHandTool();
@@ -852,11 +888,13 @@ function GameLogic.Exit()
     GameLogic:WorldUnloaded();
     GameLogic.GetFilters():apply_filters("OnWorldUnloaded");
     
+	if(GameLogic.codeGlobal) then
+		GameLogic.codeGlobal:Destroy();
     GameLogic.codeGlobal = nil;
+end
 end
 
 local slow_timer_tick = 1;
-
 
 -- global sandbox user defined variables in the world. It is recreated on each world load on demand.
 -- @return CodeGlobals object associated with the current world.
@@ -1696,6 +1734,19 @@ function GameLogic:GetText(text)
     return options:GetText(text);
 end
 
+-- @param title: additional text to show to the user in the login box
+-- @param callbackFunc: optional callback function when user actually signed in
+function GameLogic.SignIn(title, callbackFunc)
+	NPL.load("(gl)script/apps/Aries/Creator/Game/Login/ParaWorldLoginDocker.lua");
+	local ParaWorldLoginDocker = commonlib.gettable("MyCompany.Aries.Game.MainLogin.ParaWorldLoginDocker")
+	if(ParaWorldLoginDocker) then
+		ParaWorldLoginDocker.SignIn(title, callbackFunc)
+	else
+		if(callbackFunc) then
+			callbackFunc(false);
+		end
+	end
+end
 
 -- global custom user or game event
 function GameLogic:event(event)

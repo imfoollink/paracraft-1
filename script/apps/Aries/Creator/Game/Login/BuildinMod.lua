@@ -33,10 +33,26 @@ BuildinMod.buildin_mods = {
 		version = "1.4.6",
 		homepage = "https://github.com/tatfook/NPLCAD",
 	},
+    {
+		name = "NplCad2", 
+		package_path = "npl_packages/ParacraftBuildinMod/", 
+		displayName = L"NplCad 2", 
+		text=L"系统内置插件",
+		version = "1.0.0",
+		homepage = "https://github.com/tatfook/NplCad2",
+	},
+    {
+		name = "NplBrowser", 
+		package_path = "npl_packages/ParacraftBuildinMod/", 
+		displayName = L"NplBrowser", 
+		text=L"系统内置插件",
+		version = "1.0.0",
+		homepage = "https://github.com/tatfook/NplBrowserScript",
+	},
 	{
 		name = "STLExporter", 
 		-- package_path = "npl_packages/STLExporter/", 
-		package_path = "npl_packages/ParacraftBuildinMod/", 
+		package_path = "npl_packages/ParacraftBuildinMod/",  
 		displayName = L"STL 3D打印模型导出", 
 		text=L"系统内置插件",
 		version = "1.1",
@@ -50,6 +66,15 @@ BuildinMod.buildin_mods = {
 		text=L"系统内置插件",
 		version = "1.3",
 		homepage = "https://github.com/tatfook/WorldShare",
+	},
+	{
+		name = "ExplorerApp", 
+		-- package_path = "tatfook/ExplorerApp/", 
+		package_path = "npl_packages/ParacraftBuildinMod/", 
+		displayName = L"探索APP", 
+		text=L"系统内置插件",
+		version = "0.9",
+		homepage = "https://github.com/tatfook/ExplorerApp",
 	},
 	{
 		name = "EMapMod", 
@@ -66,7 +91,7 @@ BuildinMod.buildin_mods = {
 		package_path = "npl_packages/ParacraftBuildinMod/", 
 		displayName = L"代码方块Web编辑器", 
 		text=L"系统内置插件",
-		version = "0.1",
+		version = "1.0",
 		homepage = "https://github.com/tatfook/CodeBlockEditor",
 	},
 	{
@@ -86,6 +111,8 @@ BuildinMod.buildin_mods = {
 		text=L"系统内置插件",
 		version = "0.1",
 		homepage = "https://github.com/NPLPackages/PluginBlueTooth",
+		-- load this module when the package is loaded
+		loadOnStartup = true, 
 	},
 	-- TODO: add more preinstalled paracraft mod package here
 };
@@ -105,9 +132,22 @@ function BuildinMod.AddBuildinMods()
 			end
 			if(loaded_packages[mod.package_path]) then
 				pluginloader:AddSystemModule(mod.name or mod.package_path, mod);
+				if(mod.loadOnStartup) then
+					pluginloader:LoadPlugin(mod.name);
+				end
 			else
 				LOG.std(nil, "error", "BuildinMod", "failed to open package %s", mod.package_path);
 			end
 		end
 	end
+end
+function BuildinMod.GetModByName(name)
+    if(not name)then
+        return
+    end
+    for __,mod in ipairs(BuildinMod.buildin_mods) do
+        if(mod.name == name)then
+            return mod;
+        end
+    end
 end

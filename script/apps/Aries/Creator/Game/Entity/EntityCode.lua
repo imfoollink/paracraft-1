@@ -10,6 +10,10 @@ local EntityCode = commonlib.gettable("MyCompany.Aries.Game.EntityManager.Entity
 -------------------------------------------------------
 ]]
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeBlock.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Items/InventoryBase.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeActorItemStack.lua");
+local CodeActorItemStack = commonlib.gettable("MyCompany.Aries.Game.Code.CodeActorItemStack");
+local InventoryBase = commonlib.gettable("MyCompany.Aries.Game.Items.InventoryBase");
 local CodeBlock = commonlib.gettable("MyCompany.Aries.Game.Code.CodeBlock");
 local Direction = commonlib.gettable("MyCompany.Aries.Game.Common.Direction")
 local BlockEngine = commonlib.gettable("MyCompany.Aries.Game.BlockEngine")
@@ -17,10 +21,15 @@ local block_types = commonlib.gettable("MyCompany.Aries.Game.block_types")
 local names = commonlib.gettable("MyCompany.Aries.Game.block_types.names")
 local GameLogic = commonlib.gettable("MyCompany.Aries.Game.GameLogic")
 local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
+local ItemStack = commonlib.gettable("MyCompany.Aries.Game.Items.ItemStack");
+local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
 
 local Entity = commonlib.inherit(commonlib.gettable("MyCompany.Aries.Game.EntityManager.EntityBlockBase"), commonlib.gettable("MyCompany.Aries.Game.EntityManager.EntityCode"));
 
+Entity:Property({"languageConfigFile", "", "GetLanguageConfigFile", "SetLanguageConfigFile"})
 Entity:Signal("beforeRemoved")
+Entity:Signal("editModeChanged")
+Entity:Signal("inventoryChanged", function(slotIndex) end)
 
 -- class name
 Entity.class_name = "EntityCode";
@@ -33,6 +42,46 @@ Entity.is_regional = true;
 local maxConnectedCodeBlockCount = 255;
 
 function Entity:ctor()
+	-- persistent actor instances as inventory items
+	self.inventory = InventoryBase:new():Init();
+	self.inventory:SetClient();
+	self.inventory:SetSlotCount(10); 
+	self.inventory:SetOnChangedCallback(function(inventory, slot_index)
+		self:OnInventoryChanged(slot_index);
+	end);
+end
+
+-- this should be called when inventory itemstack or its values are changed
+-- this function can be called many times per frame, but only one merged inventoryChanged signal is fired.
+function Entity:OnInventoryChanged(slot_index)
+	local codeblock = self:GetCodeBlock()
+	if(codeblock) then
+		if(self.slot_index_to_refresh == nil) then
+			self.slot_index_to_refresh = slot_index;
+		else
+			self.slot_index_to_refresh = "all";
+		end
+		-- we will delay refresh to next frame, just incase lots of the same event fired in the same frame. 
+		self.refreshInventoryTimer =  self.refreshInventoryTimer or commonlib.Timer:new({callbackFunc = function(timer)
+			local slotIndex;
+			if(self.slot_index_to_refresh ~= "all") then
+				slotIndex = self.slot_index_to_refresh;
+			end
+			self:RefreshInventoryActors(slotIndex);
+			self.slot_index_to_refresh = nil;
+		end})
+		self.refreshInventoryTimer:Change(0.01);
+	end
+	
+end
+
+-- @param slotIndex: if nil, it means all
+function Entity:RefreshInventoryActors(slotIndex)
+	local codeblock = self:GetCodeBlock()
+	if(codeblock) then
+		codeblock:RefreshInventoryActor(slotIndex);
+		self:inventoryChanged(slotIndex);
+	end
 end
 
 function Entity:Destroy()
@@ -54,19 +103,133 @@ function Entity:OnNeighborChanged(x,y,z, from_block_id)
 	end
 end
 
+
+function Entity:SetBlocklyXMLCode(blockly_xmlcode)
+	self.blockly_xmlcode = blockly_xmlcode;
+end
+
+function Entity:GetBlocklyXMLCode()
+	return self.blockly_xmlcode;
+end
+
+
+function Entity:SetBlocklyNPLCode(blockly_nplcode)
+	self.blockly_nplcode = blockly_nplcode;
+	self:SetCommand(blockly_nplcode);
+end
+
+function Entity:GetBlocklyNPLCode()
+	return self.blockly_nplcode;
+end
+
+function Entity:SetNPLCode(nplcode)
+	self.nplcode = nplcode;
+	self:SetCommand(nplcode);
+end
+
+function Entity:GetNPLCode()
+	return self.nplcode or self:GetCommand();
+end
+
+function Entity:TextToXmlInnerNode(text)
+	if(text and commonlib.Encoding.HasXMLEscapeChar(text)) then
+		return {name="![CDATA[", [1] = text};
+	else
+		return text;
+	end
+end
+	
+function Entity:IsBlocklyEditMode()
+	return self.isBlocklyEditMode;
+end
+
+function Entity:SetBlocklyEditMode(bEnabled)
+	if(self.isBlocklyEditMode~=bEnabled) then
+		self.isBlocklyEditMode = bEnabled;
+		if(bEnabled)  then
+			self:SetCommand(self:GetBlocklyNPLCode());
+		else
+			self:SetCommand(self:GetNPLCode());
+		end
+		self:editModeChanged();
+	end
+end
+
 function Entity:SaveToXMLNode(node, bSort)
 	node = Entity._super.SaveToXMLNode(self, node, bSort);
 	node.attr.allowGameModeEdit = self:IsAllowGameModeEdit();
 	node.attr.isPowered = self.isPowered;
+	node.attr.isBlocklyEditMode = self:IsBlocklyEditMode();
+	if(self:GetLanguageConfigFile()~="") then
+		node.attr.languageConfigFile = self:GetLanguageConfigFile();
+	end
+	
+	if(self:GetBlocklyXMLCode() and self:GetBlocklyXMLCode()~="") then
+		local blocklyNode = {name="blockly", };
+		node[#node+1] = blocklyNode;
+		blocklyNode[#blocklyNode+1] = {name="xmlcode", self:TextToXmlInnerNode(self:GetBlocklyXMLCode())}
+		blocklyNode[#blocklyNode+1] = {name="nplcode", self:TextToXmlInnerNode(self:GetBlocklyNPLCode()) }
+		if(self:GetNPLCode()~=self:GetBlocklyNPLCode()) then
+			blocklyNode[#blocklyNode+1] = {name="code", self:TextToXmlInnerNode(self:GetNPLCode())}
+		end
+	end
+	if(self.includedFiles) then
+		local includedFilesNode = {name="includedFiles", };
+		node[#node+1] = includedFilesNode;
+		for i, name in ipairs(self.includedFiles) do
+			includedFilesNode[i] = {name="filename", name}
+		end
+	end
 	return node;
 end
 
 function Entity:LoadFromXMLNode(node)
 	Entity._super.LoadFromXMLNode(self, node);
-	self:SetAllowGameModeEdit(node.attr.allowGameModeEdit == "true");
-	local isPowered = node.attr.isPowered == "true";
+	self:SetAllowGameModeEdit(node.attr.allowGameModeEdit == "true" or node.attr.allowGameModeEdit == true);
+	self.isBlocklyEditMode = (node.attr.isBlocklyEditMode == "true" or node.attr.isBlocklyEditMode == true);
+	self.languageConfigFile = node.attr.languageConfigFile;
+
+	local isPowered = (node.attr.isPowered == "true" or node.attr.isPowered == true);
 	if(isPowered) then
 		self:ScheduleRefresh();
+	end
+	for i=1, #node do
+		if(node[i].name == "blockly") then
+			for j=1, #(node[i]) do
+				local sub_node = node[i][j];
+				local code = sub_node[1]
+				if(code) then
+					if(type(code) == "table" and type(code[1]) == "string") then
+						-- just in case cmd.name == "![CDATA["
+						code = code[1];
+					end
+				end
+				if(type(code) == "string") then
+					if(sub_node.name == "xmlcode") then
+						self:SetBlocklyXMLCode(code);
+					elseif(sub_node.name == "nplcode") then
+						self:SetBlocklyNPLCode(code);
+					elseif(sub_node.name == "code") then
+						self:SetNPLCode(code);
+					end
+				end
+			end
+		elseif(node[i].name == "includedFiles") then
+			self.includedFiles = {};
+			for j=1, #(node[i]) do
+				local sub_node = node[i][j];
+				local filename = sub_node[1]
+				self.includedFiles[j] = filename;
+			end
+		end
+	end
+	if(not self.isBlocklyEditMode and not self.nplcode) then
+		self.nplcode = self:GetCommand();
+	end
+	if(self.isBlocklyEditMode) then
+		self:SetCommand(self:GetBlocklyNPLCode());
+	else
+		self:SetCommand(self:GetNPLCode());
 	end
 end
 
@@ -111,6 +274,17 @@ function Entity:Refresh()
 			self:Restart();
 		elseif(not self.isPowered and codeBlock:IsLoaded()) then
 			self:Stop();
+		end
+	end
+end
+
+-- virtual function:
+function Entity:SetDisplayName(v)
+	if(self:GetDisplayName()~= v) then
+		Entity._super.SetDisplayName(self, v);
+		local codeBlock = self:GetCodeBlock()
+		if(codeBlock) then
+			codeBlock:SetBlockName(v);
 		end
 	end
 end
@@ -317,6 +491,16 @@ function Entity:ForEachNearbyCodeEntity(callbackFunc)
 	end
 end
 
+-- virtual function:
+function Entity:OnBeforeRunThisBlock()
+	
+end
+
+-- virtual function:
+function Entity:OnAfterRunThisBlock()
+	
+end
+
 -- run regardless of whether it is powered. 
 function Entity:Restart()
 	self:Stop();
@@ -326,7 +510,10 @@ function Entity:Restart()
 		function restartCodeEntity_(codeEntity)
 			local codeBlock = codeEntity:GetCodeBlock(true)
 			if(codeBlock) then
-				codeBlock:Run();
+				codeEntity:OnBeforeRunThisBlock()
+				codeBlock:Run(function()
+					codeEntity:OnAfterRunThisBlock();
+				end);
 			end
 		end
 		local id = self:GetBlockId();
@@ -355,6 +542,19 @@ function Entity:Restart()
 		end
 	end
 end
+
+-- whether the given code entity is in the same group of code entities of the current one, that should be activated as a group. 
+-- return true if they are in the same group. 
+function Entity:IsEntitySameGroup(entity)
+	local bIsSame;
+	self:ForEachNearbyCodeEntity(function(codeEntity)
+		if(codeEntity == entity) then
+			bIsSame = true;
+		end
+	end);
+	return bIsSame;
+end
+
 
 -- stop regardless of whether it is powered. 
 function Entity:Stop()
@@ -408,4 +608,57 @@ function Entity:SetLastCommandResult(last_result)
 		local x, y, z = self:GetBlockPos();
 		BlockEngine:NotifyNeighborBlocksChange(x, y, z, BlockEngine:GetBlockId(x, y, z));
 	end
+end
+
+function Entity:GetLanguageConfigFile()
+	return self.languageConfigFile or "";
+end
+
+function Entity:SetLanguageConfigFile(filename)
+	if(self:GetLanguageConfigFile() ~= filename) then
+		self.languageConfigFile = filename;
+	end
+end
+
+function Entity:ClearIncludedFiles()
+	self.includedFiles = nil;
+end
+
+function Entity:AddIncludedFile(filename)
+	self.includedFiles = self.includedFiles or {};
+	for _, name in ipairs(self.includedFiles) do
+		if(name == filename) then
+			return
+		end
+	end
+	self.includedFiles[#(self.includedFiles)+1] = filename;
+end
+
+function Entity:GetAllIncludedFiles()
+	return self.includedFiles;
+end
+
+-- return CodeActorItemStack object or nil
+function Entity:CreateActorItemStack()
+	local item = ItemStack:new():Init(block_types.names.CodeActorInstance, 1);
+	if(self.inventory:IsFull()) then
+		self.inventory:SetSlotCount(self.inventory:GetSlotCount()+5);
+		self:GetInventoryView():UpdateFromInventory();
+	end
+	local bAdded, slot_index = self.inventory:AddItem(item);
+	if(slot_index) then
+		return self:GetCodeActorItemStack(slot_index);
+	end
+end
+
+function Entity:GetCodeActorItemStack(slot_index)
+	local item = self.inventory:GetItem(slot_index);
+	if(item) then
+		return CodeActorItemStack:new():Init(self, item, slot_index);
+	end
+end
+
+-- create a wrapper of item stack 
+function Entity:GetItemStackIndex(itemStack)
+	return self.inventory:GetItemStackIndex(itemStack)
 end

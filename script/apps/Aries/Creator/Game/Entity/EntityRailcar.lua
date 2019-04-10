@@ -230,7 +230,7 @@ end
 
 -- Returns true if the entity takes up space in its containing block, such as animals,mob and players. 
 function Entity:CanBeCollidedWith(entity)
-    return true;
+	return true;
 end
 
 -- Returns true if this entity should push and be pushed by other entities when colliding.

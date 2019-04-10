@@ -37,6 +37,7 @@ local TaskManager = commonlib.gettable("MyCompany.Aries.Game.TaskManager")
 local block_types = commonlib.gettable("MyCompany.Aries.Game.block_types")
 local GameLogic = commonlib.gettable("MyCompany.Aries.Game.GameLogic")
 local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
+local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
 local QuickSelectBar = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.QuickSelectBar");
 
 local math_abs = math.abs;
@@ -343,12 +344,12 @@ function Entity:PlayStepSound()
 		local step_block = BlockEngine:GetBlock(x,y, z);
 		if(step_block and step_block.step_sound) then
 			-- in case of slab block
-			step_block:play_step_sound(0.15);
+			step_block:play_step_sound();
 		else
 			-- solid block
 			step_block = BlockEngine:GetBlock(x,y-1, z);
 			if(step_block) then
-				step_block:play_step_sound(0.15);
+				step_block:play_step_sound();
 			end	
 		end
 	end
@@ -445,6 +446,9 @@ end
 function Entity:LoadFromXMLNode(node)
 	Entity._super.LoadFromXMLNode(self, node);
 	self.skin = node.attr.skin;
+	if(self.skin) then
+		Files.FindFile(self.skin);
+	end
 	for _, subnode in ipairs(node) do 
 		if(subnode.name == "teleport_list") then
 			self.tp_list = NPL.LoadTableFromString(subnode[1] or "");
@@ -884,3 +888,18 @@ function Entity:SetGravity(value)
 		obj:SetField("Gravity", self:GetGravity()*2);
 	end
 end
+
+-- @param actor: the parent ActorNPC
+function Entity:SetActor(actor)
+	self.m_actor = actor;
+end
+
+-- @param actor: the parent ActorNPC
+function Entity:GetActor()
+	return self.m_actor;
+end
+
+function Entity:SetCanRandomMove(bEnable)
+ -- empty implementation just to be compatible with EntityNPC as used in ActorNPC
+end
+

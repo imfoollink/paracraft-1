@@ -11,6 +11,10 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeAPI_MotionLooks.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Common/Direction.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/SceneContext/SelectionManager.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Commands/CmdParser.lua");
+NPL.load("(gl)script/ide/System/Scene/Cameras/AutoCamera.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/MovieManager.lua");
+local MovieManager = commonlib.gettable("MyCompany.Aries.Game.Movie.MovieManager");
+local Cameras = commonlib.gettable("System.Scene.Cameras");
 local CmdParser = commonlib.gettable("MyCompany.Aries.Game.CmdParser");
 local SelectionManager = commonlib.gettable("MyCompany.Aries.Game.SelectionManager");
 local Direction = commonlib.gettable("MyCompany.Aries.Game.Common.Direction")
@@ -18,18 +22,6 @@ local BlockEngine = commonlib.gettable("MyCompany.Aries.Game.BlockEngine")
 local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
 local GameLogic = commonlib.gettable("MyCompany.Aries.Game.GameLogic");
 local env_imp = commonlib.gettable("MyCompany.Aries.Game.Code.env_imp");
-
--- wait some time
--- @param seconds: in seconds, if nil, it is one tick or env_imp.GetDefaultTick(self)
-function env_imp:wait(seconds)
-	seconds = seconds or env_imp.GetDefaultTick(self);
-	if(self.co) then
-		self.co:SetTimeout(math.floor(seconds*1000), function()
-			env_imp.resume(self);
-		end) 
-		env_imp.yield(self);
-	end
-end
 
 -- say some text and wait for some time. 
 -- @param text: if nil, it will remove text
@@ -146,9 +138,18 @@ function env_imp:setPos(x, y, z)
 	end
 end
 
+-- @param objName: nil or "self" or any actor name. if "@p" it means current player
 -- same as getX(), getY(), getZ(), except that we return real coordinate in block unit
-function env_imp:getPos()
+function env_imp:getPos(objName)
 	local actor = self.actor;
+	if(objName) then
+		if( objName == "@p" ) then
+			local x, y, z = EntityManager.GetPlayer():GetPosition()
+			return BlockEngine:block_float(x, y, z);
+		elseif( objName ~= "self" ) then
+			actor = GameLogic.GetCodeGlobal():GetActorByName(objName);
+		end
+	end
 	if(actor) then
 		local x, y, z = actor:GetPosition();
 		if(x) then
@@ -158,8 +159,13 @@ function env_imp:getPos()
 end
 
 
--- moveTo to a given block position
--- @param x,y,z: if z is nil, y is z. x can also be "mouse-pointer" or "@p" for current player or other actor name, while y and z are nil.
+-- moveTo to a given block position or a actor position
+-- @param x,y,z: if z is nil, y is z. 
+-- x can also be "mouse-pointer" or "@p" for current player or other actor name, while y and z are nil.
+-- x can also be player name + bone name like "myActorName::R_hand" or "myActorName::"
+-- if name is "myActorName", we will move the block position of the given player
+-- if name is "myActorName::", we will move the float position of the given player
+-- if name is "myActorName::bonename", we will move the float position of the given actor's given bone
 function env_imp:moveTo(x, y, z)
 	local entity = env_imp.GetEntity(self);
 	if(entity) then
@@ -175,11 +181,22 @@ function env_imp:moveTo(x, y, z)
 				if(entity2) then
 					local x2, y2, z2 = entity2:GetBlockPos();
 					env_imp.moveTo(self, x2, y2, z2);
+				else
+					local actorName, boneName = x:match("^([^:]+)::(.*)$");
+					if(actorName) then
+						local actor = GameLogic.GetCodeGlobal():GetActorByName(actorName);
+						if(actor and actor.ComputeBoneWorldTransform) then
+							local wx, wy, wz = actor:ComputeBoneWorldTransform(boneName)
+							if(wx) then
+								entity:SetPosition(wx, wy, wz);
+							end
+						end
+					end
 				end
 			end
 		elseif(x and y) then
-			local ox,oy,oz = entity:GetBlockPos();
 			if(not z) then
+				local ox,oy,oz = entity:GetBlockPos();
 				y,z = oy, y;
 			end
 			self.actor:SetBlockPos(x,y,z);
@@ -213,28 +230,59 @@ function env_imp:turn(degree)
 end
 
 -- @param degree: [-180, 180] or "mouse-pointer" or "@p" for current player, or any actor name
-function env_imp:turnTo(degree)
+-- or "camera" for current camera
+-- @param pitch, roll: can be nil. or degree can be yaw. pitch can also be "camera"
+function env_imp:turnTo(degree, pitch, roll)
 	local entity = env_imp.GetEntity(self);
 	if(entity) then
-		if(type(degree) == "number") then
-			self.actor:SetFacing(degree*math.pi/180);
-		elseif(degree == "mouse-pointer") then
-			local result = SelectionManager:MousePickBlock(true, false, false); 
-			if(result and result.blockX) then
-				local x, y, z = entity:GetBlockPos();
-				if(result.blockX ~= x or result.blockZ ~= z) then
-					local facing = Direction.GetFacingFromOffset(result.blockX - x, result.blockY - y, result.blockZ - z);
-					self.actor:SetFacing(facing);
+		if(roll or pitch) then
+			-- tricky: pitch and roll are reversed
+			if(type(roll) == "number") then
+				entity:SetPitch(roll*math.pi/180)
+			end
+			if(pitch) then
+				if(type(pitch) == "number") then
+					entity:SetRoll(pitch*math.pi/180);
+				elseif(pitch == "camera") then
+					local pos = Cameras:GetCurrent():GetEyePosition()
+					local x, y, z = entity:GetPosition();
+					local x2, y2, z2 = pos[1], pos[2], pos[3]
+					if(x2 ~= x or z2 ~= z) then
+						pitch = Direction.GetPitchFromOffset(x2 - x, y2 - y, z2 - z);
+						entity:SetRoll(pitch);
+					end
 				end
 			end
-		elseif(type(degree) == "string") then
-			local entity2 = GameLogic.GetCodeGlobal():FindEntityByName(degree);
-			if(entity2) then
-				local x2, y2, z2 = entity2:GetBlockPos();
-				local x, y, z = entity:GetBlockPos();
+		end
+		if(degree) then
+			if(type(degree) == "number") then
+				self.actor:SetFacing(degree*math.pi/180);
+			elseif(degree == "mouse-pointer") then
+				local result = SelectionManager:MousePickBlock(true, false, false); 
+				if(result and result.blockX) then
+					local x, y, z = entity:GetBlockPos();
+					if(result.blockX ~= x or result.blockZ ~= z) then
+						local facing = Direction.GetFacingFromOffset(result.blockX - x, result.blockY - y, result.blockZ - z);
+						self.actor:SetFacing(facing);
+					end
+				end
+			elseif(degree == "camera") then
+				local pos = Cameras:GetCurrent():GetEyePosition()
+				local x, y, z = entity:GetPosition();
+				local x2, y2, z2 = pos[1], pos[2], pos[3]
 				if(x2 ~= x or z2 ~= z) then
 					local facing = Direction.GetFacingFromOffset(x2 - x, y2 - y, z2 - z);
 					self.actor:SetFacing(facing);
+				end
+			elseif(type(degree) == "string") then
+				local entity2 = GameLogic.GetCodeGlobal():FindEntityByName(degree);
+				if(entity2) then
+					local x2, y2, z2 = entity2:GetBlockPos();
+					local x, y, z = entity:GetBlockPos();
+					if(x2 ~= x or z2 ~= z) then
+						local facing = Direction.GetFacingFromOffset(x2 - x, y2 - y, z2 - z);
+						self.actor:SetFacing(facing);
+					end
 				end
 			end
 		end
@@ -353,10 +401,77 @@ function env_imp:playLoop(timeFrom, timeTo)
 	env_imp.checkyield(self);
 end
 
+-- play a bone's time series animation in the movie block.
+-- this function will return immediately.
+-- @param boneName: bone name
+-- @param timeFrom: time in milliseconds, default to 0.
+-- @param timeTo: if nil, default to timeFrom
+-- @param isLooping: default to false.
+function env_imp:playBone(boneName, timeFrom, timeTo, isLooping)
+	timeFrom = timeFrom or 0;
+	local time = timeFrom;
+	local entity = env_imp.GetEntity(self);
+	if(entity) then
+		entity:SetDummy(true);
+		entity:EnableAnimation(false);
+		local actor = env_imp.GetActor(self);
+		if(not actor) then
+			return
+		end
+		actor:SetBoneTime(boneName, time);
+
+		if(timeTo and timeTo>timeFrom) then
+			local deltaTime = math.floor(env_imp.GetDefaultTick(self)*1000);
+			local function frameMove_(timer)
+				local delta = timer:GetDelta() * actor:GetPlaySpeed();
+				time = time + delta;
+				if(time >= timeTo) then
+					if(isLooping) then
+						if((time - delta) == timeTo) then
+							time = timeFrom;
+						else
+							time = timeTo;
+						end
+					else
+						time = timeTo;
+						timer:Change();
+					end
+				end
+				actor:SetBoneTime(boneName, time);
+			end
+			if(not self.actor.playTimers) then
+				self.actor.playTimers = {};
+				self.actor:Connect("beforeRemoved", function(actor)
+					if(actor.playTimers) then
+						for _, timer in pairs(actor.playTimers) do
+							self.codeblock:KillTimer(timer);
+						end
+						actor.playTimers = nil;
+					end
+				end)
+			end
+			if(not self.actor.playTimers[boneName]) then
+				self.actor.playTimers[boneName] = self.codeblock:SetTimer(self.co:MakeCallbackFunc(frameMove_), 0, deltaTime);
+			else
+				self.actor.playTimers[boneName].callbackFunc = self.co:MakeCallbackFunc(frameMove_);
+			end
+			self.actor.playTimers[boneName]:Change(0, deltaTime);
+		end
+	end
+end
+
 function env_imp:stop()
-	if(self.actor and self.actor.playTimer) then
-		self.codeblock:KillTimer(self.actor.playTimer);
-		self.actor.playTimer = nil;
+	if(self.actor) then
+		if(self.actor.playTimer) then
+			self.codeblock:KillTimer(self.actor.playTimer);
+			self.actor.playTimer = nil;
+		end
+		if(self.actor.playTimers) then
+			for _, timer in pairs(self.actor.playTimers) do
+				self.codeblock:KillTimer(timer);
+			end
+			self.actor.playTimers = nil;
+		end
 	end
 	env_imp.checkyield(self);
 end
@@ -383,7 +498,7 @@ function env_imp:bounce()
 end
 
 -- set focus to current actor or the main player 
--- @param : nil or "myself" means current actor, "player" means the main player
+-- @param : nil or "myself" means current actor, "player" means the main player, or it can also be actor object
 function env_imp:focus(name)
 	if(not name or name == "myself") then
 		if(self.actor) then
@@ -391,6 +506,14 @@ function env_imp:focus(name)
 		end
 	elseif(name == "player") then
 		EntityManager.GetPlayer():SetFocus();
+	elseif(type(name) == "string") then
+		local actor = GameLogic.GetCodeGlobal():GetActorByName(name);
+		if(actor) then
+			actor:SetFocus();
+		end
+	elseif(type(name) == "table" and name.SetFocus) then
+		-- actor object is also supported
+		name:SetFocus()
 	end
 	env_imp.checkyield(self);
 end
@@ -446,3 +569,101 @@ function env_imp:camera(dist, pitch, facing)
 		att:SetField("CameraRotY", facing);
 	end
 end
+
+local function GetMovieChannelName_(name, codeblock)
+	if(not name or name == "myself") then
+		name = codeblock:GetFilename();
+	end
+	return name;
+end
+
+-- @param name: movie channel name. 
+-- @param x, y, z: if nil or 0, it means the closest movie block
+function env_imp:setMovie(name, x, y, z)
+	name = GetMovieChannelName_(name, self.codeblock)
+	local channel = MovieManager:CreateGetMovieChannel(name);
+	if(channel) then
+		if(not z or (z==0) ) then
+			local movieEntity = self.codeblock:GetMovieEntity();
+			if(movieEntity) then
+				x, y, z = movieEntity:GetBlockPos();
+			end
+		end
+		channel:SetStartBlockPosition(math.floor(x),math.floor(y),math.floor(z));
+	end
+end
+
+-- @param key: propertyName. "ReuseActor:bool"
+function env_imp:setMovieProperty(name, key, value)
+	name = GetMovieChannelName_(name, self.codeblock)
+	local channel = MovieManager:CreateGetMovieChannel(name);
+	if(channel) then
+		if(key == "ReuseActor") then
+			channel:SetReuseActor(value==1 and true or value);
+		elseif(key == "Speed") then
+			if(type(value) == "number") then
+				channel:SetSpeed(value);
+			end
+		elseif(key == "UseCamera") then
+			channel:SetUseCamera(value==true or value==1);
+		end
+	end
+end
+
+function env_imp:playMovie(name, timeFrom, timeTo, bLoop)
+	name = GetMovieChannelName_(name, self.codeblock)
+	local channel = MovieManager:CreateGetMovieChannel(name);
+
+	if(not channel:GetStartBlockPosition()) then
+		local movieEntity = self.codeblock:GetMovieEntity();
+		if(movieEntity) then
+			local x, y, z = movieEntity:GetBlockPos();
+			channel:SetStartBlockPosition(x, y, z);
+		end
+	end
+
+	if(bLoop) then
+		channel:PlayLooped(timeFrom, timeTo);
+	else
+		channel:Play(timeFrom, timeTo);
+	end
+
+	-- tricky: we shall stop the movie channel when code blocks playing it are all unloaded.
+	local playingCodeblocks = channel.playingCodeblocks;
+	if(not playingCodeblocks) then
+		playingCodeblocks = {};
+		channel.playingCodeblocks = playingCodeblocks;
+	end
+	if(not playingCodeblocks[self.codeblock]) then
+		playingCodeblocks[self.codeblock] = true;
+		self.codeblock:Connect("codeUnloaded", function()
+			channel.playingCodeblocks[self.codeblock] = nil;
+			if(not next(channel.playingCodeblocks)) then
+				-- only stop when the last code block stopped. 
+				channel:Stop();	
+			end
+		end)
+	end
+
+	if(not bLoop and channel:IsPlaying()) then
+		local bFinished;
+		local callbackFunc;
+		callbackFunc = self.co:MakeCallbackFunc(function()
+			channel:Disconnect("finished", callbackFunc)
+			if(not bFinished) then
+				bFinished = true;
+				env_imp.resume(self);
+			end
+		end)
+		channel:Connect("finished", callbackFunc);
+		env_imp.yield(self);
+		bFinished = true;
+	end
+end
+
+function env_imp:stopMovie(name)
+	name = GetMovieChannelName_(name, self.codeblock)
+	local channel = MovieManager:CreateGetMovieChannel(name);
+	channel:Stop();
+end
+

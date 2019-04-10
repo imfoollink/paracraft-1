@@ -16,6 +16,11 @@ NPL.load("(gl)script/ide/System/Scene/Viewports/ViewportManager.lua");
 NPL.load("(gl)script/ide/System/Windows/Mouse.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/SceneContext/AllContext.lua");
 NPL.load("(gl)script/ide/System/Windows/Screen.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeHelpWindow.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/EditCodeActor/EditCodeActor.lua");
+local EditCodeActor = commonlib.gettable("MyCompany.Aries.Game.Tasks.EditCodeActor");
+local CodeHelpWindow = commonlib.gettable("MyCompany.Aries.Game.Code.CodeHelpWindow");
+local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
 local Screen = commonlib.gettable("System.Windows.Screen");
 local BlockEngine = commonlib.gettable("MyCompany.Aries.Game.BlockEngine")
 local AllContext = commonlib.gettable("MyCompany.Aries.Game.AllContext");
@@ -40,11 +45,12 @@ function CodeBlockWindow.Show(bShow)
 	else
 		GameLogic:desktopLayoutRequested("CodeBlockWindow");
 		GameLogic:Connect("desktopLayoutRequested", CodeBlockWindow, CodeBlockWindow.OnLayoutRequested, "UniqueConnection");
+		GameLogic.GetCodeGlobal():Connect("logAdded", CodeBlockWindow, CodeBlockWindow.AddConsoleText, "UniqueConnection");
 	
 		local _this = ParaUI.GetUIObject(code_block_window_name);
 		if(not _this:IsValid()) then
-			self.width, self.height, self.margin_right, self.bottom = self:CalculateMargins();
-			_this = ParaUI.CreateUIObject("container", code_block_window_name, "_mr", 0, 0, self.width, self.bottom);
+			self.width, self.height, self.margin_right, self.bottom, self.top = self:CalculateMargins();
+			_this = ParaUI.CreateUIObject("container", code_block_window_name, "_mr", 0, self.top, self.width, self.bottom);
 			_this.zorder = -2;
 			_this.background="";
 			local refreshTimer = commonlib.Timer:new({callbackFunc = function(timer)
@@ -85,7 +91,7 @@ function CodeBlockWindow:OnLayoutRequested(requesterName)
 	end
 end
 
--- @return margin_right and bottom
+-- @return width, height, margin_right, margin_bottom, margin_top
 function CodeBlockWindow:CalculateMargins()
 	local MAX_3DCANVAS_WIDTH = 800;
 	local MIN_CODEWINDOW_WIDTH = 200+350;
@@ -100,23 +106,25 @@ function CodeBlockWindow:CalculateMargins()
 
 	local bottom = math.floor(viewport:GetMarginBottom() / Screen:GetUIScaling()[2]);
 	local margin_right = math.floor(width * Screen:GetUIScaling()[1]);
-	return width, Screen:GetHeight()-bottom, margin_right, bottom;
+	local margin_top = math.floor(viewport:GetTop() / Screen:GetUIScaling()[2]);
+	return width, Screen:GetHeight()-bottom-margin_top, margin_right, bottom, margin_top;
 end
 
 function CodeBlockWindow:OnViewportChange()
 	if(CodeBlockWindow.IsVisible()) then
 		-- TODO: use a scene/ui layout manager here
-		local width, height, margin_right, bottom = self:CalculateMargins();
+		local width, height, margin_right, bottom, top = self:CalculateMargins();
 		if(self.width ~= width or self.height ~= height) then
 			self.width = width;
 			self.height = height;
 			self.margin_right = margin_right;
 			self.bottom = bottom;
+			self.top = top;
 			local viewport = ViewportManager:GetSceneViewport();
 			viewport:SetMarginRight(self.margin_right);
 			viewport:SetMarginRightHandler(self);
 			local _this = ParaUI.GetUIObject(code_block_window_name);
-			_this:Reposition("_mr", 0, 0, self.width, self.bottom);
+			_this:Reposition("_mr", 0, self.top, self.width, self.bottom);
 			if(page) then
 				CodeBlockWindow.UpdateCodeToEntity();
 				page:Rebuild();
@@ -166,9 +174,18 @@ function CodeBlockWindow.SetCodeEntity(entity)
 	if(self.entity ~= entity) then
 		if(entity) then
 			entity:Connect("beforeRemoved", self, self.OnEntityRemoved, "UniqueConnection");
+			entity:Connect("editModeChanged", self, self.UpdateEditModeUI, "UniqueConnection");
 		end
 		if(self.entity) then
+			local codeBlock = self.entity:GetCodeBlock();
+			if(not self.entity:IsPowered() and (codeBlock and codeBlock:IsLoaded() or codeBlock:HasRunningTempCode())) then
+				if(not self.entity:IsEntitySameGroup(entity)) then
+					self.entity:Stop();
+				end
+			end
+
 			self.entity:Disconnect("beforeRemoved", self, self.OnEntityRemoved);
+			self.entity:Disconnect("editModeChanged", self, self.UpdateEditModeUI);
 			CodeBlockWindow.UpdateCodeToEntity();
 		end
 		self.entity = entity;
@@ -196,7 +213,17 @@ function CodeBlockWindow.SetCodeEntity(entity)
 		codeBlock:Connect("message", self, self.OnMessage, "UniqueConnection");
 	end
 	if(isEntityChanged) then
+		CodeBlockWindow.UpdateCodeEditorStatus()
+
+		if(EditCodeActor.GetInstance() and EditCodeActor.GetInstance():GetEntityCode() ~= entity and entity) then
+			local task = EditCodeActor:new():Init(CodeBlockWindow.GetCodeEntity());
+			task:Run();
+		end
+
 		self:entityChanged(self.entity);
+	end
+	if(not entity) then
+		CodeBlockWindow.CloseEditorWindow()
 	end
 end
 
@@ -210,8 +237,15 @@ function CodeBlockWindow.GetCodeFromEntity()
 	end
 end
 
-function CodeBlockWindow.GetCodeEntity()
-	return CodeBlockWindow.entity;
+function CodeBlockWindow.GetCodeEntity(bx, by, bz)
+	if(bx) then
+		local codeEntity = BlockEngine:GetBlockEntity(bx, by, bz)
+		if(codeEntity and codeEntity.class_name == "EntityCode") then
+			return codeEntity;
+		end
+	else
+		return CodeBlockWindow.entity;
+	end
 end
 
 function CodeBlockWindow.GetCodeBlock()
@@ -232,10 +266,16 @@ function CodeBlockWindow.IsVisible()
 end
 
 function CodeBlockWindow.Close()
+	GameLogic.GetCodeGlobal():Disconnect("logAdded", CodeBlockWindow, CodeBlockWindow.AddConsoleText);
 	if(CodeBlockWindow.isBlocklyOpened) then
 		CodeBlockWindow.CloseBlocklyWindow();
+		return
 	end
 	CodeBlockWindow:UnloadSceneContext();
+	CodeBlockWindow.CloseEditorWindow();
+end
+
+function CodeBlockWindow.CloseEditorWindow()
 	CodeBlockWindow.RestoreWindowLayout()
 	CodeBlockWindow.UpdateCodeToEntity();
 	CodeBlockWindow.HighlightCodeEntity(nil);
@@ -249,6 +289,7 @@ function CodeBlockWindow.Close()
 			entity:Stop();
 		end
 	end
+    CodeBlockWindow.SetNplBrowserVisible(false);
 end
 
 function CodeBlockWindow.RestoreWindowLayout()
@@ -267,10 +308,13 @@ function CodeBlockWindow.UpdateCodeToEntity()
 	local entity = CodeBlockWindow.GetCodeEntity()
 	if(page and entity) then
 		local code = page:GetUIValue("code");
-		entity:SetCommand(code);
-		local ctl = CodeBlockWindow.GetTextControl();
-		if(ctl) then
-			entity.cursorPos = ctl:CursorPos();
+		if(not entity:IsBlocklyEditMode()) then
+			entity:SetNPLCode(code);
+
+			local ctl = CodeBlockWindow.GetTextControl();
+			if(ctl) then
+				entity.cursorPos = ctl:CursorPos();
+			end
 		end
 	end
 end
@@ -294,6 +338,22 @@ function CodeBlockWindow.SetConsoleText(text)
 		self.console_text_linewrapped = CodeBlockWindow.DoTextLineWrap(self.console_text) or "";
 		if(page) then
 			page:SetValue("console", self.console_text_linewrapped);
+		end
+	end
+end
+
+function CodeBlockWindow:AddConsoleText(text)
+	if(page) then
+		local textAreaCtrl = page:FindControl("console");
+		local textCtrl = textAreaCtrl and textAreaCtrl.ctrlEditbox;
+		if(textCtrl) then
+			textCtrl = textCtrl:ViewPort();
+			if(textCtrl) then
+				for line in text:gmatch("[^\r\n]+") do
+					textCtrl:AddItem(line)
+				end
+				textCtrl:DocEnd();
+			end
 		end
 	end
 end
@@ -324,18 +384,22 @@ function CodeBlockWindow.OnClickCompileAndRun()
 	local codeBlock = CodeBlockWindow.GetCodeBlock();
 	local codeEntity = CodeBlockWindow.GetCodeEntity();
 	if(codeBlock and codeBlock:GetEntity()) then
+		-- GameLogic.GetFilters():apply_filters("user_event_stat", "code", "execute", nil, nil);
 		CodeBlockWindow.UpdateCodeToEntity();
 		codeBlock:GetEntity():Restart();
 	end
 end
 
-function CodeBlockWindow.OnClickOpenMovieBlock()
+function CodeBlockWindow.OnClickCodeActor()
 	local movieEntity = CodeBlockWindow.GetMovieEntity();
 	if(movieEntity) then
 		if(mouse_button=="left") then
 			local codeBlock = CodeBlockWindow.GetCodeBlock();
 			if(codeBlock) then
 				codeBlock:HighlightActors();
+
+				local task = EditCodeActor:new():Init(CodeBlockWindow.GetCodeEntity());
+				task:Run();
 			end
 		else
 			movieEntity:OpenEditor("entity");
@@ -404,6 +468,12 @@ function CodeBlockWindow.OnChangeModel()
 	local codeBlock = CodeBlockWindow.GetCodeBlock()
 	if(codeBlock) then
 		local actor;
+		local movieEntity = self.entity:FindNearByMovieEntity()	
+		if(movieEntity and not movieEntity:GetFirstActorStack()) then
+			movieEntity:CreateNPC();
+			CodeBlockWindow:GetSceneContext():UpdateCodeBlock();
+		end
+
 		local sceneContext = CodeBlockWindow:GetSceneContext();
 		if(sceneContext) then
 			actor = sceneContext:GetActor()
@@ -478,9 +548,11 @@ function CodeBlockWindow.ReplaceCode(code, bx, by, bz)
 		end
 	else
 		if(bx and by and bz) then
-			local codeEntity = BlockEngine:GetBlockEntity(bx, by, bz)
-			if(codeEntity and codeEntity.class_name == "EntityCode") then
-				codeEntity:SetCommand(code);
+			local codeEntity = CodeBlockWindow.GetCodeEntity(bx, by, bz)
+			if(codeEntity) then
+				if(not codeEntity:IsBlocklyEditMode()) then
+					codeEntity:SetNPLCode(code);
+				end
 				return true;
 			end
 		end
@@ -505,9 +577,25 @@ function CodeBlockWindow.IsSameBlock(bx, by, bz)
 	return true;
 end
 
+-- @param blockly_xmlcode: xml text for blockly
+-- @param code: this is the generated NPL code, should be readonly until we have two way binding. 
+-- @param bx, by, bz: if not nil, we will only insert when they match the current code block.
+function CodeBlockWindow.UpdateBlocklyCode(blockly_xmlcode, code, bx, by, bz)
+	local codeEntity = CodeBlockWindow.GetCodeEntity(bx, by, bz);
+	if(codeEntity) then
+		codeEntity:SetBlocklyEditMode(true);
+		codeEntity:SetBlocklyXMLCode(blockly_xmlcode);
+		codeEntity:SetBlocklyNPLCode(code);
+
+		if(CodeBlockWindow.IsSameBlock(bx, by, bz)) then
+			CodeBlockWindow.ReplaceCode(code, bx, by, bz)
+		end
+	end
+end
+
 -- @param bx, by, bz: if not nil, we will only insert when they match the current code block.
 function CodeBlockWindow.InsertCodeAtCurrentLine(code, forceOnNewLine, bx, by, bz)
-	if(not CodeBlockWindow.IsSameBlock(bx, by, bz)) then
+	if(not CodeBlockWindow.IsSameBlock(bx, by, bz) or CodeBlockWindow.IsBlocklyEditMode()) then
 		return false;
 	end
 
@@ -589,7 +677,128 @@ function CodeBlockWindow.UpdateBlocklyWindowSize()
 	end
 end
 
+function CodeBlockWindow.IsBlocklyEditMode()
+	local entity = CodeBlockWindow.GetCodeEntity()
+	if(entity) then
+		return entity:IsBlocklyEditMode()
+	end
+end
 
+function CodeBlockWindow.UpdateCodeEditorStatus()
+	local textCtrl = CodeBlockWindow.GetTextControl();
+	if(textCtrl) then
+		local bReadOnly = CodeBlockWindow.IsBlocklyEditMode();
+		textCtrl:setReadOnly(bReadOnly)
+	end
+	local entity = CodeBlockWindow.GetCodeEntity()
+	if(entity) then
+		CodeHelpWindow.SetLanguageConfigFile(entity:GetLanguageConfigFile());
+	end
+    CodeBlockWindow.SetNplBrowserVisible(CodeBlockWindow.IsBlocklyEditMode());
+end
+
+-- default to standard NPL language. One can create domain specific language configuration files. 
+function CodeBlockWindow.OnClickSelectLanguageSettings()
+	local entity = CodeBlockWindow.GetCodeEntity()
+	if(not entity) then
+		return
+	end
+	local old_value = entity:GetLanguageConfigFile();
+	NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/OpenFileDialog.lua");
+	local OpenFileDialog = commonlib.gettable("MyCompany.Aries.Game.GUI.OpenFileDialog");
+	OpenFileDialog.ShowPage('<a class="linkbutton_yellow" href="https://github.com/nplpackages/paracraft/wiki/languageConfigFile">'..L"点击查看帮助"..'</a>', function(result)
+		if(result) then
+			NPL.load("(gl)script/apps/Aries/Creator/Game/Code/LanguageConfigurations.lua");
+			local LanguageConfigurations = commonlib.gettable("MyCompany.Aries.Game.Code.LanguageConfigurations");
+			if(not LanguageConfigurations:IsBuildinFilename(result)) then
+				local filename = Files.GetWorldFilePath(result)
+				if(not filename) then
+					filename = result:gsub("%.npl$", "");
+					filename = filename..".npl";
+
+					_guihelper.MessageBox(format("是否要新建语言配置文件:%s", filename), function(res)
+						if(res and res == _guihelper.DialogResult.Yes) then
+							local fullPath = Files.WorldPathToFullPath(filename);
+							ParaIO.CopyFile("script/apps/Aries/Creator/Game/Code/Examples/HelloLanguage.npl", fullPath, false);
+							entity:SetLanguageConfigFile(filename);
+							CodeBlockWindow.UpdateCodeEditorStatus()
+						end
+					end, _guihelper.MessageBoxButtons.YesNo);
+					_guihelper.MessageBox(L"文件不存在");
+					return;
+				end
+			end
+			entity:SetLanguageConfigFile(result);
+			CodeBlockWindow.UpdateCodeEditorStatus()
+		end
+	end, old_value or "", L"选择语言配置文件", "npl");
+end
+
+function CodeBlockWindow.OnClickEditMode(name)
+	local entity = CodeBlockWindow.GetCodeEntity()
+	if(not entity) then
+		return
+	end
+	if(CodeBlockWindow.IsBlocklyEditMode()) then
+		if(name == "codeMode") then
+			entity:SetBlocklyEditMode(false);
+			CodeBlockWindow.UpdateCodeEditorStatus()
+		end
+	else
+		if(name == "blockMode") then
+			CodeBlockWindow.UpdateCodeToEntity();
+			entity:SetBlocklyEditMode(true);
+			CodeBlockWindow.UpdateCodeEditorStatus()
+		end
+	end
+	if(mouse_button == "right") then
+		CodeBlockWindow.OnClickSelectLanguageSettings()
+	end
+	if(name == "blockMode") then
+		CodeBlockWindow.OpenBlocklyEditor()
+	end
+end
+
+function CodeBlockWindow.UpdateEditModeUI()
+	if(page) then
+		if(CodeBlockWindow.IsBlocklyEditMode()) then
+			_guihelper.SetUIColor(page:FindControl("blockMode"), "#0b9b3a")
+			_guihelper.SetUIColor(page:FindControl("codeMode"), "#808080")
+		else
+			_guihelper.SetUIColor(page:FindControl("blockMode"), "#808080")
+			_guihelper.SetUIColor(page:FindControl("codeMode"), "#0b9b3a")
+		end
+		local textCtrl = CodeBlockWindow.GetTextControl();
+		if(textCtrl) then
+			textCtrl:SetText(CodeBlockWindow.GetCodeFromEntity());
+		end
+	end
+    CodeBlockWindow.SetNplBrowserVisible(CodeBlockWindow.IsBlocklyEditMode())
+end
+function CodeBlockWindow.SetNplBrowserVisible(b)
+    if(page)then
+        page:CallMethod("nplbrowser_instance","SetVisible",b)
+    end
+end
+function CodeBlockWindow.GetBlockEditorUrl()
+    local blockpos;
+	local entity = CodeBlockWindow.GetCodeEntity();
+	if(entity) then
+		local bx, by, bz = entity:GetBlockPos();
+		if(bz) then
+			blockpos = format("%d,%d,%d", bx, by, bz);
+		end
+	end
+
+	local request_url = "npl://blockeditor"
+	if(blockpos) then
+		request_url = request_url..format("?blockpos=%s", blockpos);
+	end
+    NPL.load("(gl)script/apps/Aries/Creator/Game/Mod/DefaultFilters.lua");
+	local DefaultFilters = commonlib.gettable("MyCompany.Aries.Game.DefaultFilters");
+	local url = DefaultFilters.cmd_open_url(request_url)
+    return url;
+end
 function CodeBlockWindow.OpenBlocklyEditor()
 	local blockpos;
 	local entity = CodeBlockWindow.GetCodeEntity();
@@ -600,19 +809,26 @@ function CodeBlockWindow.OpenBlocklyEditor()
 		end
 	end
 
+	local request_url = "npl://blockeditor"
+	if(blockpos) then
+		request_url = request_url..format("?blockpos=%s", blockpos);
+	end
+
 	local NplCefBrowserManager = CodeBlockWindow.GetChromeBrowserManager();
 	if(NplCefBrowserManager) then
 		 -- Open a new window
 		if(not CodeBlockWindow.isBlocklyOpened) then
 			CodeBlockWindow.isBlocklyOpened = true;
+			NPL.load("(gl)script/apps/Aries/Creator/Game/Mod/DefaultFilters.lua");
+			local DefaultFilters = commonlib.gettable("MyCompany.Aries.Game.DefaultFilters");
+			local url = DefaultFilters.cmd_open_url(request_url)
+
 			local config = NplCefBrowserManager:GetWindowConfig(blocklyWndName);
-			if(config and not config.visible) then
+			if(false and config and not config.visible) then
 				config.visible = true;
+				config.url = url;
 				NplCefBrowserManager:Show(config);
 			else
-				NPL.load("(gl)script/apps/Aries/Creator/Game/Mod/DefaultFilters.lua");
-				local DefaultFilters = commonlib.gettable("MyCompany.Aries.Game.DefaultFilters");
-				local url = DefaultFilters.cmd_open_url("npl://blockeditor")
 				NplCefBrowserManager:Open({id = blocklyWndName, url = url, showTitleBar=false, withControl = false, x = 0, y = 0, width = math.max(400, Screen:GetWidth()-self.width+205), height = Screen:GetHeight(), });
 			end
 			CodeBlockWindow.UpdateBlocklyWindowSize();
@@ -620,11 +836,7 @@ function CodeBlockWindow.OpenBlocklyEditor()
 			CodeBlockWindow.CloseBlocklyWindow();
 		end
 	else
-		local requestParams = ""
-		if(blockpos) then
-			requestParams = format("?blockpos=%s", blockpos);
-		end
-		GameLogic.RunCommand("/open npl://blockeditor"..requestParams);
+		GameLogic.RunCommand("/open "..request_url);
 	end
 end
 
@@ -649,6 +861,15 @@ end
 
 function CodeBlockWindow.OnOpenTutorials()
 	ParaGlobal.ShellExecute("open", L"https://keepwork.com/official/paracraft/codeblock", "", "", 1);
+
+	GameLogic.GetFilters():apply_filters("user_event_stat", "help", "browse.codeblock", nil, nil);
+end
+
+function CodeBlockWindow.OpenExternalFile(filename)
+	local filepath = Files.WorldPathToFullPath(filename);
+	if(filepath) then
+		GameLogic.RunCommand("/open npl://editcode?src="..filepath);
+	end
 end
 
 -- Redirect this object as a scene context, so that it will receive all key/mouse events from the scene. 

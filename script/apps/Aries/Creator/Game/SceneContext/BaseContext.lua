@@ -162,6 +162,21 @@ function BaseContext:handleHookedMouseEvent(event)
 	if(self:handleItemMouseEvent(event)) then
 		return true;
 	end
+
+	if(event:GetType() == "mousePressEvent") then
+		if(GameLogic.GetCodeGlobal():BroadcastKeyPressedEvent("mouse_buttons", event)) then
+			-- we need to leak event to global scene, even we processed it
+			-- return true;
+		end
+	elseif(event:GetType() == "mouseReleaseEvent") then
+		if(event:button() == "left" and event:GetDragDist() < 10) then
+			if(GameLogic.GetCodeGlobal():BroadcastBlockClickEvent("BroadcastBlockClickEvent", event)) then
+				-- we need to leak event to global scene, even we processed it
+				-- return true;
+			end
+		end
+	end
+
 	return event:isAccepted();
 end
 
@@ -507,6 +522,7 @@ function BaseContext:mouseWheelEvent(event)
 	if(self:handleHookedMouseEvent(event)) then
 		return;
 	end
+
 	if(not ParaCamera.GetAttributeObject():GetField("EnableMouseWheel", false)) then
 		if(GameLogic.IsFPSView or (GameLogic.options.lock_mouse_wheel and not event.ctrl_pressed) or (not GameLogic.options.lock_mouse_wheel and event.ctrl_pressed)) then
 			-- mouse wheel to toggle item in hand
@@ -515,6 +531,10 @@ function BaseContext:mouseWheelEvent(event)
 			-- control + mouse wheel to zoom camera
 			self:handleCameraWheelEvent(event);
 		end
+	end
+
+	if(GameLogic.GetCodeGlobal():BroadcastKeyPressedEvent("mouse_wheel", mouse_wheel)) then
+		return true;
 	end
 end
 
@@ -536,6 +556,7 @@ function BaseContext:handleHookedKeyEvent(event)
 	end
 
 	if(GameLogic.GetCodeGlobal():BroadcastKeyPressedEvent(event.keyname)) then
+		event:accept();
 		return true;
 	end
 end
@@ -559,6 +580,10 @@ end
 
 -- virtual function handle escape key
 function BaseContext:HandleEscapeKey()
+	if GameLogic.GetFilters():apply_filters("HandleEscapeKey") then
+		return false
+	end
+
 	local state = System.GetState();
 	if(type(state) == "table" and state.OnEscKey~=nil) then
 		if(state.name ~= "MessageBox") then
@@ -597,6 +622,7 @@ function BaseContext:TryDestroyBlock(result, is_allow_delete_terrain)
 			if(EntityManager.GetFocus():CanReachBlockAt(result.blockX,result.blockY,result.blockZ)) then
 				local task = MyCompany.Aries.Game.Tasks.DestroyBlock:new({blockX = result.blockX,blockY = result.blockY, blockZ = result.blockZ, is_allow_delete_terrain=is_allow_delete_terrain})
 				task:Run();
+				GameLogic.GetFilters():apply_filters("user_event_stat", "block", "destroy:"..tostring(block_template.id), 1, nil);
 			end
 		elseif(result.entity) then
 			local bx, by, bz = result.entity:GetBlockPos();
@@ -604,6 +630,7 @@ function BaseContext:TryDestroyBlock(result, is_allow_delete_terrain)
 			if(block_template and block_template:CanDestroyBlockAt(bx, by, bz)) then
 				local task = MyCompany.Aries.Game.Tasks.DestroyBlock:new({blockX = bx,blockY = by, blockZ = bz, })
 				task:Run();
+				GameLogic.GetFilters():apply_filters("user_event_stat", "block", "destroy:"..tostring(block_template.id), 1, nil);
 			end
 		else
 			-- if there is no block, we may have hit the terrain. 
@@ -663,11 +690,14 @@ function BaseContext:OnCreateBlock(result)
 		-- for special blocks. 
 		local task = MyCompany.Aries.Game.Tasks.CreateBlock:new({blockX = x,blockY = y, blockZ = z, block_id = block_id, side = result.side, entityPlayer = EntityManager.GetPlayer()})
 		task:Run();
+		GameLogic.GetFilters():apply_filters("user_event_stat", "block", "create:"..tostring(block_id), 1, nil);
 	else
 		local ctrl_pressed = ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_LCONTROL) or ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_RCONTROL);
 		local shift_pressed = ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_LSHIFT) or ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_RSHIFT);
 		local alt_pressed = ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_LMENU) or ParaUI.IsKeyPressed(DIK_SCANCODE.DIK_RMENU);
 		
+		GameLogic.GetFilters():apply_filters("user_event_stat", "block", "create:"..tostring(block_id or result.block_id), 1, nil);
+
 		if(GameLogic.GameMode:IsEditor()) then
 			if(alt_pressed and shift_pressed) then
 				if(block_id or result.block_id == block_types.names.water) then
@@ -893,6 +923,9 @@ function BaseContext:HandleGlobalKey(event)
 				elseif(dik_key == "DIK_M") then
 					-- show module manager
 					GameLogic.RunCommand("/show mod");
+				elseif(dik_key == "DIK_O") then
+					-- show module manager
+					GameLogic.RunCommand("/menu file.loadworld");
 				end
 			end
 		end
@@ -927,6 +960,7 @@ function BaseContext:HandleGlobalKey(event)
 	elseif(dik_key == "DIK_ESCAPE") then
 		-- handle escape key
 		self:HandleEscapeKey();
+		event:accept();
 	elseif(dik_key == "DIK_LWIN") then
 		-- the menu key on andriod. 
 		if(System.options.IsMobilePlatform and ParaScene.IsSceneEnabled()) then
@@ -934,16 +968,13 @@ function BaseContext:HandleGlobalKey(event)
 		end
 	elseif(dik_key == "DIK_S" and ctrl_pressed) then
 		GameLogic.QuickSave();
+		event:accept();
 	elseif(dik_key == "DIK_F12" and ctrl_pressed) then
 		System.App.Commands.Call("ScreenShot.HideAllUI");
 	elseif(dik_key == "DIK_I" and ctrl_pressed and event.shift_pressed) then
 		GameLogic.RunCommand("/open npl://debugger");
 	elseif(dik_key == "DIK_F1") then
-		if(ctrl_pressed) then
-			GameLogic.RunCommand("/menu help.help");
-		else
-			GameLogic.RunCommand("/menu help.actiontutorial");
-		end
+		GameLogic.RunCommand("/menu help.help");
 	end
 	return event:isAccepted();
 end

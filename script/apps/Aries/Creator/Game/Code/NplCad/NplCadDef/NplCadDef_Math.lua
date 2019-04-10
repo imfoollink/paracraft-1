@@ -1,15 +1,15 @@
 --[[
-Title: CodeCadDef_Math
+Title: NplCadDef_Math
 Author(s): leio
 Date: 2018/9/10
 Desc: 
 use the lib:
 -------------------------------------------------------
-NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeCad/CodeCadDef/CodeCadDef_Math.lua");
-local CodeCadDef_Math = commonlib.gettable("MyCompany.Aries.Game.Code.CodeCad.CodeCadDef_Math");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Code/NplCad/NplCadDef/NplCadDef_Math.lua");
+local NplCadDef_Math = commonlib.gettable("MyCompany.Aries.Game.Code.NplCad.NplCadDef_Math");
 -------------------------------------------------------
 ]]
-local CodeCadDef_Math = commonlib.gettable("MyCompany.Aries.Game.Code.CodeCad.CodeCadDef_Math");
+local NplCadDef_Math = commonlib.gettable("MyCompany.Aries.Game.Code.NplCad.NplCadDef_Math");
 local cmds = {
 {
 	type = "math_op", 
@@ -25,6 +25,7 @@ local cmds = {
 			type = "field_dropdown",
 			options = {
 				{ "+", "+" },{ "-", "-" },{ "*", "*" },{ "/", "/" },
+				{ ">", ">" },{ "<", "<" },{ ">=", ">=" },{ "<=", "<=" },{ "==", "==" },{ "~=", "~=" },
 			},
 		},
 		{
@@ -48,79 +49,7 @@ say(1+1)
 ]]}},
 },
 
-{
-	type = "math_op_compare_number", 
-	message0 = L"%1 %2 %3",
-	arg0 = {
-		{
-			name = "left",
-			type = "input_value",
-            shadow = { type = "math_number", },
-		},
-		{
-			name = "op",
-			type = "field_dropdown",
-			options = {
-				{ ">", ">" },{ "<", "<" },{ ">=", ">=" },{ "<=", "<=" },{ "==", "==" },{ "!=", "!=" },
-			},
-		},
-		{
-			name = "right",
-			type = "input_value",
-            shadow = { type = "math_number", },
-		},
-	},
-	output = {type = "field_number",},
-	category = "Math", 
-	helpUrl = "", 
-	canRun = false,
-	func_description = '((%s) %s (%s))',
-	ToNPL = function(self)
-		return string.format('(%s) %s (%s)', self:getFieldAsString('left'), self:getFieldAsString('op'), self:getFieldAsString('right'));
-	end,
-	examples = {{desc = "", canRun = true, code = [[
-if(3>1) then
-   say("3>1 == true")
-end
-]]}},
-},
 
-{
-	type = "math_op_compare", 
-	message0 = L"%1 %2 %3",
-	arg0 = {
-		{
-			name = "left",
-			type = "input_value",
-            shadow = { type = "text", value = "",},
-		},
-		{
-			name = "op",
-			type = "field_dropdown",
-			options = {
-				{ "==", "==" },{ "!=", "!=" },
-			},
-		},
-		{
-			name = "right",
-			type = "input_value",
-            shadow = { type = "text", value = "",},
-		},
-	},
-	output = {type = "field_number",},
-	category = "Math", 
-	helpUrl = "", 
-	canRun = false,
-	func_description = '((%s) %s (%s))',
-	ToNPL = function(self)
-		return string.format('(%s) %s (%s)', self:getFieldAsString('left'), self:getFieldAsString('op'), self:getFieldAsString('right'));
-	end,
-	examples = {{desc = "", canRun = true, code = [[
-if("1" == "1") then
-   say("equal")
-end
-]]}},
-},
 
 {
 	type = "random", 
@@ -231,60 +160,6 @@ end
 },
 
 {
-	type = "join", 
-	message0 = L"连接字符串%1和%2",
-	arg0 = {
-		{
-			name = "left",
-			type = "input_value",
-            shadow = { type = "text", value = "hello",},
-			text = "hello",
-		},
-		{
-			name = "right",
-			type = "input_value",
-            shadow = { type = "text", value = "world",},
-			text = "world",
-		},
-	},
-	output = {type = "field_number",},
-	category = "Math", 
-	helpUrl = "", 
-	canRun = false,
-	func_description = '(%s..%s)',
-	ToNPL = function(self)
-		return string.format('("%s".."%s")', self:getFieldAsString('left'), self:getFieldAsString('right'));
-	end,
-	examples = {{desc = "", canRun = true, code = [[
-say("hello ".."world".."!!!")
-]]}},
-},
-
-{
-	type = "lengthOf", 
-	message0 = L"字符串%1的长度",
-	arg0 = {
-		{
-			name = "left",
-			type = "input_value",
-            shadow = { type = "text", value = "hello",},
-			text = "hello",
-		},
-	},
-	output = {type = "field_number",},
-	category = "Math", 
-	helpUrl = "", 
-	canRun = false,
-	func_description = '(#%s)',
-	ToNPL = function(self)
-		return string.format('(#"%s")', self:getFieldAsString('left'));
-	end,
-	examples = {{desc = "", canRun = true, code = [[
-say("length of hello is "..(#"hello"));
-]]}},
-},
-
-{
 	type = "mod", 
 	message0 = L"%1除以%2的余数",
 	arg0 = {
@@ -388,6 +263,6 @@ say("math.abs(-1)=="..math.abs(1), 1)
 ]]}},
 },
 };
-function CodeCadDef_Math.GetCmds()
+function NplCadDef_Math.GetCmds()
 	return cmds;
 end

@@ -71,6 +71,7 @@ Entity:Property({"position", nil, "getPosition", "setPosition"});
 
 Entity:Signal("focusIn");
 Entity:Signal("focusOut");
+-- position changed
 Entity:Signal("valueChanged");
 
 
@@ -1213,6 +1214,34 @@ function Entity:SetRotation(facing, pitch)
 	end
 end
 
+-- rotation around Z axis
+function Entity:SetRoll(roll)
+	local obj = self:GetInnerObject();
+	if(obj) then
+		obj:SetField("roll", roll or 0);
+	end
+end
+
+-- rotation around Z axis
+function Entity:GetRoll(roll)
+	local obj = self:GetInnerObject();
+	return obj and obj:GetField("roll", 0) or 0;
+end
+
+-- rotation around X axis
+function Entity:SetPitch(pitch)
+	local obj = self:GetInnerObject();
+	if(obj) then
+		obj:SetField("pitch", pitch or 0);
+	end
+end
+
+-- rotation around X axis
+function Entity:GetPitch()
+	local obj = self:GetInnerObject();
+	return obj and obj:GetField("pitch", 0) or 0;
+end
+
 -- Sets the entity's position and rotation. it will correct y so it will snap to ground. 
 -- @param posRotIncrements: smoothed frames. we will move to x,y,z in this number of ticks. 
 function Entity:SetPositionAndRotation2(x,y,z,yaw, pitch, posRotIncrements)
@@ -1374,7 +1403,7 @@ function Entity:CanBePushedBy(fromEntity)
 end
 
 -- Returns true if other Entities should be prevented from moving through this Entity.
-function Entity:CanBeCollidedWith()
+function Entity:CanBeCollidedWith(entity)
     return false;
 end
 
@@ -2199,6 +2228,59 @@ function Entity:SetSneaking(bSneaking)
     self.bSneaking = bSneaking;
 end
 
+-- if true, this entity can not be pushed by other movable entities
+function Entity:SetStaticBlocker(bIsBlocker)
+end
+
+-- return true if this entity can not be pushed by other movable entities
+function Entity:IsStaticBlocker()
+end
+
+--@param dx,dy,dz: if nil, they default to 0. 
+-- @param filterEntityFunc: nil or a function(destEntity, entity) end, this function should return true for destEntity's collision to be considered.
+-- Entity.CanBeCollidedWith and Entity.IsVisible are good choices for this function. 
+-- @return dx,dy,dz: return the smallest push out according to current overlapping status 
+function Entity:CalculatePushOut(dx,dy,dz, entityFileterFunc)
+	dx = dx or 0;
+	dy = dy or 0;
+	dz = dz or 0;
+	if (self.noClip) then
+		return dx,dy,dz;
+	end
+	local boundingBox = self:GetCollisionAABB();
+	local aabb = boundingBox:clone_from_pool():AddCoord(dx, dy, dz)
+	local listCollisions = PhysicsWorld:GetCollidingBoundingBoxes(aabb, self, entityFileterFunc);
+
+	local deltaX, deltaY, deltaZ = 0, 0, 0;
+	for i= 1, listCollisions:size() do
+		local dx_, dy_, dz_, bCollided = listCollisions:get(i):CalculateOffset(aabb);
+		if(bCollided) then
+			if(math.abs(dx_) < math.abs(dy_)) then
+				if(math.abs(dx_) < math.abs(dz_)) then
+					if((deltaX <= 0 and dx_<deltaX) or (deltaX>=0 and dx_ > deltaX)) then
+						deltaX = dx_;
+					end
+				else
+					if((deltaZ <= 0 and dz_<deltaZ) or (deltaZ>=0 and dz_ > deltaZ)) then
+						deltaZ = dz_;
+					end
+				end
+			else
+				if(math.abs(dy_) < math.abs(dz_)) then
+					if((deltaY <= 0 and dy_<deltaY) or (deltaY>=0 and dy_ > deltaY)) then
+						deltaY = dy_;
+					end
+				else
+					if((deltaZ <= 0 and dz_<deltaZ) or (deltaZ>=0 and dz_ > deltaZ)) then
+						deltaZ = dz_;
+					end
+				end
+			end
+		end
+	end
+	return dx+deltaX, dy+deltaY, dz+deltaZ;
+end
+
 -- Tries to moves the entity by the passed in displacement. 
 -- this function is usually used by entities which need to process physics all by itself 
 -- (instead of relying on physicsObj or default low level c++). 
@@ -2617,4 +2699,40 @@ end
 
 function Entity:GetColor()
 	return self.color or 0xffffff;
+end
+
+-- @param opacity: [0,1]
+function Entity:SetOpacity(opacity)
+	local obj = self:GetInnerObject();
+	if(obj) then
+		obj:SetField("opacity", opacity or 1);
+	end
+end
+
+-- @return [0,1]
+function Entity:GetOpacity()
+	local obj = self:GetInnerObject();
+	if(obj) then
+		return obj:GetField("opacity", 1);
+	else
+		return 1
+	end
+end
+
+-- @param effectId: 0 will use unlit biped selection effect. 1 will use yellow border style. -1 to disable it.
+function Entity:SetSelectionEffect(effectId)
+	local obj = self:GetInnerObject();
+	if(obj) then
+		obj:SetField("SelectionEffect", effectId or 1);
+	end
+end
+
+-- @return effectId: 0 will use unlit biped selection effect. 1 will use yellow border style. -1 means disable
+function Entity:GetSelectionEffect()
+	local obj = self:GetInnerObject();
+	if(obj) then
+		return obj:GetField("SelectionEffect", 1);
+	else
+		return 1
+	end
 end

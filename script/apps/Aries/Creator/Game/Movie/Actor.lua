@@ -13,6 +13,8 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/Common/TimeSeries.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/MovieClipController.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/MovieTimeSeriesEditingTask.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/MovieClipTimeLine.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/MovieManager.lua");
+local MovieManager = commonlib.gettable("MyCompany.Aries.Game.Movie.MovieManager");
 local vector3d = commonlib.gettable("mathlib.vector3d");
 local MovieClipTimeLine = commonlib.gettable("MyCompany.Aries.Game.Movie.MovieClipTimeLine");
 local MovieTimeSeriesEditing = commonlib.gettable("MyCompany.Aries.Game.Tasks.MovieTimeSeriesEditing");
@@ -47,10 +49,44 @@ function Actor:ctor()
 	self.custom_vars = {};
 end
 
-function Actor:Init(itemStack, movieclipEntity)
+function Actor:Init(itemStack, movieclipEntity, movieclip)
 	self:SetItemStack(itemStack)
 	self.movieclipEntity = movieclipEntity;
+	self:SetMovieClip(movieclip or self.movieclipEntity:GetMovieClip())
 	return self;
+end
+
+function Actor:SetInitParams(params)
+	if(not self.initParams) then
+		self.initParams = params;
+	else
+		commonlib.partialcompare(self.initParams, params);
+	end
+end
+
+function Actor:GetInitParams()
+	return self.initParams;
+end
+
+function Actor:SetInitParam(name, value)
+	self.initParams = self.initParams or {};
+	self.initParams[name] = value;
+end
+
+function Actor:GetInitParam(name)
+	return self.initParams and self.initParams[name];
+end
+
+-- virtual:
+function Actor:ApplyInitParams()
+end
+
+function Actor:SetCodeBlock(codeblock)
+	self.codeblock = codeblock;
+end
+
+function Actor:GetCodeBlock()
+	return self.codeblock;
 end
 
 function Actor:SetItemStack(itemStack)
@@ -60,6 +96,10 @@ end
 
 function Actor:GetTimeSeries()
 	return self.TimeSeries;
+end
+
+-- this is called right after all actors in movie clips have been created. 
+function Actor:OnCreate()
 end
 
 -- find actor by its display name in containing movie entity
@@ -140,20 +180,33 @@ end
 
 -- get the movie clip that contains this actor. 
 function Actor:GetMovieClip()
-	if(self.movieclipEntity) then
-		return self.movieclipEntity:GetMovieClip();
-	end
+	return self.movieclip;
+end
+
+function Actor:SetMovieClip(movieClip)
+	self.movieclip = movieClip;
 end
 
 function Actor:GetMovieClipEntity()
 	return self.movieclipEntity;
 end
 
+-- whether its persistent. 
+function Actor:IsPersistent()
+	return self.is_persistent;
+end
+
+-- whether the entity should be serialized to disk. 
+function Actor:SetPersistent(bIsPersistent)
+	self.is_persistent = bIsPersistent;
+end
+
+
 -- it is only in playing mode when activated by a circuit. 
 -- any other way of triggering the movieclip is not playing mode(that is edit mode)
 function Actor:IsPlayingMode()
-	if(self.movieclipEntity) then
-		return self.movieclipEntity:IsPlayingMode();
+	if(self.movieclip) then
+		return self.movieclip:IsPlayingMode();
 	end
 end
 
@@ -540,6 +593,14 @@ function Actor:UpsertKeyFrame(key_time, data)
 	self:EndModify();
 end
 
+-- paste all key frames between [fromTime, toTime] to time
+function Actor:PasteKeyFramesInRange(time, fromTime, toTime)
+	self:BeginModify();
+	self.TimeSeries:PasteKeyFramesInRange(time, fromTime, toTime);
+	self:SetModified();
+	self:EndModify();
+end
+
 -- move keyframe from from_keytime to keytime
 function Actor:MoveKeyFrame(keytime, from_keytime)
 	self:BeginModify();
@@ -832,12 +893,13 @@ end
 
 -- taking control of the give entity. But it will not delete the entity when actor is removed.
 function Actor:BecomeAgent(entity)
-	if(entity and entity:isa(EntityManager.EntityMovable)) then
+	if(entity) then --  and entity:isa(EntityManager.EntityMovable)
 		local lastEntity = self:GetEntity();
-		if(lastEntity) then	
+		if(lastEntity ~= entity) then	
 			self:DestroyEntity();
 		end
 		self.entity = entity;
 		self.isAgent = true;
+		MovieManager:AddActorName(entity.name or "");
 	end
 end

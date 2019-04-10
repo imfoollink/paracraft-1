@@ -383,6 +383,10 @@ function ItemStack:SetDataField(fieldname, value)
 	end
 end
 
+function ItemStack:GetDataTable()
+	return self.serverdata;
+end
+
 -- this is the text shown at the right bottom of the icon in pe:slot control. 
 -- by default, this is count if bigger than 1, and "" if count is 1
 -- if the displayname contains [XXX], text in square brackets will also be displayed. 
@@ -405,14 +409,22 @@ end
 function ItemStack:GetTooltip()
 	local item = self:GetItem();
 	if(item) then
-		return self:GetDataField("tooltip") or item:GetTooltipFromItemStack(self);
+		local tip = self:GetDataField("tooltip")
+		if(tip == nil or tip == "") then
+			tip = item:GetTooltipFromItemStack(self);
+		end
+		return tip;
 	end
 end
 
 function ItemStack:GetDisplayName()
 	local item = self:GetItem();
 	if(item) then
-		return self:GetDataField("tooltip") or item:GetDisplayName();
+		local tip = self:GetDataField("tooltip")
+		if(tip == nil or tip == "") then
+			tip = item:GetDisplayName();
+		end
+		return tip;
 	else
 		return "";
 	end

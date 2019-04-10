@@ -16,12 +16,20 @@ GameLogic.GetCodeGlobal():BroadcastStartEvent();
 ]]
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeUI.lua");
 NPL.load("(gl)script/ide/System/Windows/Application.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Network/LobbyService/LobbyServer.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Network/LobbyService/LobbyServerViaTunnel.lua");
+NPL.load("(gl)script/ide/math/bit.lua");
+
+local LobbyServer = commonlib.gettable("MyCompany.Aries.Game.Network.LobbyServer");
+local LobbyServerViaTunnel = commonlib.gettable("MyCompany.Aries.Game.Network.LobbyServerViaTunnel");
 local Application = commonlib.gettable("System.Windows.Application");
 local CodeUI = commonlib.gettable("MyCompany.Aries.Game.Code.CodeUI");
 local SelectionManager = commonlib.gettable("MyCompany.Aries.Game.SelectionManager");
 local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
 local BlockEngine = commonlib.gettable("MyCompany.Aries.Game.BlockEngine");
 local CodeGlobals = commonlib.inherit(commonlib.gettable("System.Core.ToolBase"), commonlib.gettable("MyCompany.Aries.Game.Code.CodeGlobals"));
+
+CodeGlobals:Signal("logAdded", function(text) end)
 
 function CodeGlobals:ctor()
 	-- exposing these API to globals
@@ -31,8 +39,14 @@ function CodeGlobals:ctor()
 		pairs = pairs,
 		tostring = tostring,
 		tonumber = tonumber,
+	
 		type = type,
 		unpack = unpack,
+		setmetatable = setmetatable,
+		getmetatable = getmetatable,
+		rawset = rawset,
+		rawget = rawget,
+		assert = assert,
 		math = { abs = math.abs, acos = math.acos, asin = math.asin, 
 			  atan = math.atan, atan2 = math.atan2, ceil = math.ceil, cos = math.cos, 
 			  cosh = math.cosh, deg = math.deg, exp = math.exp, floor = math.floor, 
@@ -41,6 +55,7 @@ function CodeGlobals:ctor()
 			  min = math.min, modf = math.modf, pi = math.pi, pow = math.pow, 
 			  rad = math.rad, random = math.random, sin = math.sin, sinh = math.sinh, 
 			  sqrt = math.sqrt, tan = math.tan, tanh = math.tanh },
+		bit = mathlib.bit,
 		string = { byte = string.byte, char = string.char, find = string.find, 
 			  format = string.format, gmatch = string.gmatch, gsub = string.gsub, 
 			  len = string.len, lower = string.lower, match = string.match, 
@@ -48,13 +63,9 @@ function CodeGlobals:ctor()
 			  upper = string.upper },
 		format = string.format,
 		table = { insert = table.insert, maxn = table.maxn, remove = table.remove, 
-			getn = table.getn,
-			sort = table.sort },
+			getn = table.getn, sort = table.sort, concat = table.concat },
 		os = { clock = os.clock, difftime = os.difftime, time = os.time },
 		alert = _guihelper.MessageBox, 
-		cmd = function(...)
-			return GameLogic.RunCommand(...);
-		end,
 		real = function(bx,by,bz)
 			return BlockEngine:real(bx,by,bz);
 		end,
@@ -85,13 +96,64 @@ function CodeGlobals:ctor()
 		getBlock = function(x,y,z)
 			return BlockEngine:GetBlockIdAndData(math.floor(x), math.floor(y), math.floor(z));
 		end,
+		-- get the block entity: advanced function
+		getBlockEntity = function(x, y, z)
+			return EntityManager.GetBlockEntity(math.floor(x), math.floor(y), math.floor(z));
+		end,
 		-- set block id at given position
 		setBlock = function(x,y,z, blockId, blockData)
 			return BlockEngine:SetBlock(math.floor(x), math.floor(y), math.floor(z), blockId, blockData);
 		end,
+		-- similar to commonlib.gettable(tabNames) but in page scope.
+		-- @param tabNames: table names like "models.users"
+		gettable = function(tabNames)
+			return commonlib.gettable(tabNames, self:GetCurrentGlobals());
+		end,
+		-- similar to commonlib.createtable(tabNames) but in world scope.
+		-- @param tabNames: table names like "models.users"
+		createtable = function (tabNames, init_params)
+			return commonlib.createtable(tabNames, init_params, self:GetCurrentGlobals());
+		end,
+		-- same as commonlib.inherit()
+		-- @param baseClass: string or table or nil
+		-- @param new_class: string or table or nil
+		inherit = function(baseClass, new_class, ctor)
+			if(type(baseClass) == "string") then
+				baseClass = commonlib.gettable(baseClass, self:GetCurrentGlobals());
+			end
+			if(type(new_class) == "string") then
+				new_class = commonlib.gettable(new_class, self:GetCurrentGlobals());
+			end
+			return commonlib.inherit(baseClass, new_class, ctor);
+		end,
+		saveUserData = function(name, value, bIsGlobal, bDeferSave)
+			return GameLogic.GetPlayerController():SaveLocalUserWorldData(name, value, bIsGlobal, bDeferSave)
+		end,
+		loadUserData = function(name, default_value, bIsGlobal)
+			return GameLogic.GetPlayerController():LoadLocalUserWorldData(name, default_value, bIsGlobal)
+		end,
+		saveWorldData = function(name, value, filename)
+			return self:SaveWorldData(name, value, filename)
+		end,
+		loadWorldData = function(name, default_value, filename)
+			return self:LoadWorldData(name, default_value, filename)
+		end,
+
+		----------------------
+		-- @NOTE: the following may not be safe to expose to users
+		----------------------
+		NPL = { load = NPL.load },
+		System = System, 
+		commonlib = commonlib, 
+		ParaIO = ParaIO,
+		GameLogic = GameLogic,
+        NplOce = NplOce,
+		Game = MyCompany.Aries.Game,
 	};
 
 	self:Reset();
+
+	GameLogic:Connect("beforeWorldSaved", self, self.OnWorldSave, "UniqueConnection");
 end
 
 -- call this to clear all globals to reuse this class for future use. 
@@ -127,8 +189,84 @@ function CodeGlobals:Reset()
 	-- active code blocks
 	self.codeblocks= {};
 
+	-- world data
+	self.worldData = nil;
+
 	-- clear UI if any
 	CodeUI:Clear();
+
+	-- TODO: 
+	LobbyServer.GetSingleton():Connect("handleMessage", self, self.handleNetworkEvent, "UniqueConnection");
+	LobbyServerViaTunnel.GetSingleton():Connect("handleMessage", self, self.handleNetworkEvent, "UniqueConnection");
+end
+
+function CodeGlobals:log(obj, ...)
+	commonlib.echo(obj, ...);
+	if(type(obj) == "string") then
+		self:logAdded(string.format(obj, ...));
+	else
+		self:logAdded(commonlib.serialize_in_length(obj, 100));
+	end
+end
+
+function CodeGlobals:OnWorldSave()
+	if(self.worldData) then
+		for filename, data in pairs(self.worldData) do
+			if(data.isDirty_) then
+				local filepath = GameLogic.GetWorldDirectory().."codeblockdata/"..filename;
+				ParaIO.CreateDirectory(filepath);
+				local file = ParaIO.open(filepath, "w");
+				if(file:IsValid()) then
+					data.isDirty_ = nil;
+					local text = commonlib.serialize(data, true)
+					if(text) then
+						file:write(text,#text);
+					end
+					file:close();
+					LOG.std(nil, "info", "CodeGlobals", "save world data to %s", filepath);
+				else
+					LOG.std(nil, "warn", "CodeGlobals", "failed to save world data to %s", filepath);
+				end
+			end
+		end
+	end
+end
+
+-- save data to world directory, usually used in level editor code
+-- the actual saving happens when user saved the whole world
+-- @param filename: if nil, it defaults to "worlddata"
+function CodeGlobals:SaveWorldData(name, value, filename)
+	filename = filename or "worlddata"
+	if(not self.worldData) then
+		self.worldData = {};
+	end
+	local data = self.worldData[filename];
+	if(not data) then
+		data = {};
+		self.worldData[filename] = data;
+	end
+	data.isDirty_ = true;
+	data[name] = value;
+end
+
+function CodeGlobals:LoadWorldData(name, value, filename)
+	filename = filename or "worlddata"
+	local data = self.worldData and self.worldData[filename]
+	if(not data) then
+		local filepath = GameLogic.GetWorldDirectory().."codeblockdata/"..filename;
+		local file = ParaIO.open(filepath, "r");
+		if(file:IsValid()) then
+			data = NPL.LoadTableFromString(file:GetText())
+			if(type(data) == "table") then
+				data.isDirty_ = false;
+			end
+			file:close();
+		end
+		self.worldData = self.worldData or {};
+		data = data or {};
+		self.worldData[filename] = data;
+	end
+	return data[name or ""];
 end
 
 function CodeGlobals:SetCurrentCoroutine(co)
@@ -162,8 +300,10 @@ function CodeGlobals:RemoveActor(actor)
 end
 
 function CodeGlobals:OnActorNameChange(actor, oldName, newName)
-	if(self.actors[oldName] == actor) then
+	if(oldName and self.actors[oldName] == actor) then
 		self.actors[oldName] = nil;
+	end
+	if(newName) then
 		self.actors[newName] = actor;
 	end
 end
@@ -214,12 +354,37 @@ function CodeGlobals:RegisterKeyPressedEvent(callbackFunc)
 	self:CreateGetTextEvent("keyPressedEvent"):AddEventListener("msg", callbackFunc);
 end
 
-function CodeGlobals:BroadcastKeyPressedEvent(keyname)
+function CodeGlobals:BroadcastKeyPressedEvent(keyname, param1)
 	self:SetAnyKeyDown(true);
 	local event = self:GetTextEvent("keyPressedEvent");
 	if(event) then
-		return event:DispatchEvent({type="msg", keyname = keyname});
+		return event:DispatchEvent({type="msg", keyname = keyname, param1 = param1});
 	end
+end
+
+function CodeGlobals:UnregisterKeyPressedEvent(callbackFunc)
+	self:UnregisterTextEvent("keyPressedEvent", callbackFunc)
+end
+
+function CodeGlobals:RegisterBlockClickEvent(callbackFunc)
+	self:CreateGetTextEvent("onBlockClicked"):AddEventListener("msg", callbackFunc);
+end
+
+function CodeGlobals:BroadcastBlockClickEvent(blockid)
+	local event = self:GetTextEvent("onBlockClicked");
+	if(event) then
+		local result = SelectionManager:MousePickBlock();
+		if(result and result.block_id and result.block_id>0 and result.blockX) then
+			return event:DispatchEvent({type="msg", blockid = result.block_id, param1 = {
+				blockid = result.block_id,
+				x = result.blockX, y = result.blockY, z = result.blockZ, side = result.side
+			}});
+		end
+	end
+end
+
+function CodeGlobals:UnregisterBlockClickEvent(callbackFunc)
+	self:UnregisterTextEvent("onBlockClicked", callbackFunc)
 end
 
 function CodeGlobals:HandleGameEvent(event)
@@ -279,12 +444,143 @@ function CodeGlobals:UnregisterTextEvent(text, callbackFunc)
 	end
 end
 
-function CodeGlobals:UnregisterKeyPressedEvent(callbackFunc)
-	local event = self:GetTextEvent("keyPressedEvent");
-	if(event) then
-		event:RemoveEventListener("msg", callbackFunc);
+-- try to start lobby server if not started. 
+-- @param bSigninIfNot: whether to force signin
+function CodeGlobals:CheckLobbyServer(bSigninIfNot)
+
+
+	--self.isLobbyStarted = LobbyServer.GetSingleton():IsStarted() and LobbyServerViaTunnel.GetSingleton():IsStarted();
+	
+	local lobbyServerStarted = LobbyServer.GetSingleton():IsStarted();
+	local LobbyServerViaTunnelStarted = LobbyServerViaTunnel.GetSingleton():IsStarted();
+	
+	local function OnLobbyViaTunnelStartedGlobal(_, msg)
+		self:UnregisterTextEvent("OnLobbyViaTunnelStartedGlobal", OnLobbyViaTunnelStartedGlobal);
+		self.hasAskedSignin = false;
+	end
+	
+	local function OnLobbyStartedGlobal(_, msg)
+
+		self:UnregisterTextEvent("OnLobbyStartedGlobal", OnLobbyStartedGlobal);
+		if msg.msg == "true" then
+			if not LobbyServerViaTunnelStarted then
+				self:RegisterTextEvent("OnLobbyViaTunnelStartedGlobal", OnLobbyViaTunnelStartedGlobal);
+				GameLogic.RunCommand("/startLobbyServer -callback OnLobbyViaTunnelStartedGlobal -tunnelhost 1.tunnel.keepwork.com -tunnelport 8099");
+			else
+				self.hasAskedSignin = false;
+			end
+		else
+			self.hasAskedSignin = false;
+		end
+	end
+	
+	local function onSignIn(bSucceed)
+		if bSucceed then
+			if not lobbyServerStarted then
+				self:RegisterTextEvent("OnLobbyStartedGlobal", OnLobbyStartedGlobal);
+				GameLogic.RunCommand("/startLobbyServer -callback OnLobbyStartedGlobal");
+			else
+				OnLobbyStartedGlobal(nil, {msg="true"})
+			end
+		else
+			self.hasAskedSignin = false;
+		end
+	end
+	
+	if((not lobbyServerStarted or not LobbyServerViaTunnelStarted) and bSigninIfNot) then
+		if(not self.hasAskedSignin) then
+			self.hasAskedSignin = true;
+			GameLogic.SignIn(L"", onSignIn);
+		end
+	end
+	
+	self.isLobbyStarted = lobbyServerStarted or LobbyServerViaTunnelStarted;
+	return self.isLobbyStarted;
+end
+
+function CodeGlobals:RegisterNetworkEvent(event_name, callbackFunc)
+	self:CheckLobbyServer(true);
+	local event = self:CreateGetTextEvent(event_name);
+	event:AddEventListener("net", callbackFunc);
+	
+	if event_name == "connect" then
+		local clients = LobbyServer.GetSingleton():GetClients();
+		for k, v in pairs(clients) do
+			event:DispatchEvent({type="net", msg={userinfo = v}});
+		end
+		
+		clients = LobbyServerViaTunnel.GetSingleton():GetClients();
+		for k, v in pairs(clients) do
+			event:DispatchEvent({type="net", msg={userinfo = v}});
+		end
 	end
 end
+
+function CodeGlobals:UnregisterNetworkEvent(text, callbackFunc, codeblock)
+	local event = self:GetTextEvent(text);
+	if(event) then
+		event:RemoveEventListener("net", callbackFunc);
+		if(text == "connect" and event:GetEventListenerCount("net") == 0) then
+			LobbyServer.GetSingleton():StopAll();
+			LobbyServerViaTunnel.GetSingleton():StopAll()
+			self.isLobbyStarted = false;
+		end
+	end
+end
+
+-- send a named message to one computer in the network
+-- @param event_name: if nil, we will send an binary stream (msg) to keepworkUsername, 
+-- which needs to be nid/ip:port (*8099, \\\\10.27.3.5 8099)
+function CodeGlobals:SendNetworkEvent(keepworkUsername, event_name, msg)
+	if(not self:CheckLobbyServer()) then
+		return
+	end
+
+	if(event_name) then
+		if LobbyServer.GetSingleton():IsStarted() then
+			LobbyServer.GetSingleton():SendTo(keepworkUsername, event_name, msg);
+		end
+		
+		if LobbyServerViaTunnel.GetSingleton():IsStarted() then
+			LobbyServerViaTunnel.GetSingleton():SendTo(keepworkUsername, event_name, msg);
+		end
+	else
+		if LobbyServer.GetSingleton():IsStarted() then
+			LobbyServer.GetSingleton():SendOriginalMessage(keepworkUsername, msg);
+		end
+		
+		if LobbyServerViaTunnel.GetSingleton():IsStarted() then
+			LobbyServerViaTunnel.GetSingleton():SendOriginalMessage(keepworkUsername, msg);
+		end
+	end
+end
+
+-- send a named message to all computers in the network
+function CodeGlobals:BroadcastNetworkEvent(event_name, msg)
+	if(not self:CheckLobbyServer()) then
+		return
+	end
+	
+	if LobbyServer.GetSingleton():IsStarted() then
+		LobbyServer.GetSingleton():BroadcastMessage(event_name, msg)
+	end
+	
+	if LobbyServerViaTunnel.GetSingleton():IsStarted() then
+		LobbyServerViaTunnel.GetSingleton():BroadcastMessage(event_name, msg)
+	end
+end
+
+-- when this computer received a message from the network.
+-- test code: GameLogic.GetCodeGlobal():handleNetworkEvent("updateScore", {nid="aaa", score=1121})
+-- @param event_name: "disconnect", "connect" are two predefined events alongside other user events
+-- @param onFinishedCallback: can be nil
+function CodeGlobals:handleNetworkEvent(event_name, msg, onFinishedCallback)
+	local event = self:GetTextEvent(event_name);
+	if(event) then
+		event:DispatchEvent({type="net", msg=msg, onFinishedCallback=onFinishedCallback});
+	end
+end
+
 
 function CodeGlobals:GetCurrentMetaTable()
 	return self.curMetaTable;
@@ -343,3 +639,4 @@ function CodeGlobals:IsKeyPressed(keyname)
 	end
 	return false;
 end
+

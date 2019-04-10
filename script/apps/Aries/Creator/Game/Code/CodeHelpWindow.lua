@@ -8,9 +8,16 @@ use the lib:
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeHelpWindow.lua");
 local CodeHelpWindow = commonlib.gettable("MyCompany.Aries.Game.Code.CodeHelpWindow");
 CodeHelpWindow.Show(true)
+CodeHelpWindow.SetLanguageConfigFile(filename)
+-- or use following
+CodeHelpWindow.ClearAll()
+CodeHelpWindow.SetCategories(langConfig.GetCategoryButtons())
+CodeHelpWindow.SetAllCmds(langConfig.GetAllCmds());
+CodeHelpWindow.AddCodeExamples()
 -------------------------------------------------------
 ]]
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeHelpItem.lua");
+local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
 local CodeHelpItem = commonlib.gettable("MyCompany.Aries.Game.Code.CodeHelpItem");
 local CodeHelpWindow = commonlib.inherit(commonlib.gettable("System.Core.ToolBase"), commonlib.gettable("MyCompany.Aries.Game.Code.CodeHelpWindow"));
 
@@ -19,32 +26,76 @@ local page;
 local self = CodeHelpWindow;
 
 CodeHelpWindow.category_index = 1;
-CodeHelpWindow.categories = {
-{name = "Motion", text = L"运动", colour="#0078d7", },
-{name = "Looks", text = L"外观" , colour="#7abb55", },
-{name = "Events", text = L"事件", colour="#764bcc", },
-{name = "Control", text = L"控制", colour="#d83b01", },
-{name = "Sound", text = L"声音", colour="#8f6d40", },
-{name = "Sensing", text = L"感知", colour="#69b090", },
-{name = "Operators", text = L"运算", colour="#569138", },
-{name = "Data", text = L"数据", colour="#459197", },
-
-};
+CodeHelpWindow.categories = default_categories;
 
 ---------------------
 -- CodeHelpWindow
 ---------------------
-
+local page;
+CodeHelpWindow.currentItems = {};
+CodeHelpWindow.selected_code_name = nil;
 local category_items = {};
 local all_command_names = {};
+local languageConfigFile = "";
+
+-- public:
+-- see also: https://github.com/NPLPackages/paracraft/wiki/languageConfigFile
+function CodeHelpWindow.SetLanguageConfigFile(filename)
+	if(languageConfigFile ~= (filename or "")) then
+		languageConfigFile = filename;
+		CodeHelpWindow.category_index = 1;
+		CodeHelpWindow.ClearAll();
+		CodeHelpWindow.InitCmds();
+		CodeHelpWindow.OnChangeCategory(nil, true);
+	end
+end
+
+function CodeHelpWindow.GetLanguageConfigFile()
+	return languageConfigFile;
+end
+
+function CodeHelpWindow.ClearAll()
+	CodeHelpWindow.cmdInited = nil;
+	category_items = {};
+	all_command_names = {};
+	CodeHelpWindow.categories = {};
+	CodeHelpWindow.currentItems = {};
+	CodeHelpWindow.selected_code_name = nil;
+end
+
+-- public:
+function CodeHelpWindow.SetCategories(categories)
+	CodeHelpWindow.categories = categories;
+end
 
 function CodeHelpWindow.InitCmds()
 	if(not CodeHelpWindow.cmdInited) then
 		CodeHelpWindow.cmdInited = true;
-		NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeHelpData.lua");
-		local CodeHelpData = commonlib.gettable("MyCompany.Aries.Game.Code.CodeHelpData");
-		CodeHelpData.LoadParacraftCodeFunctions();
+		local filename = CodeHelpWindow.GetLanguageConfigFile()
+		LOG.std(nil, "info", "CodeHelpWindow", "code block language configuration file changed to %s", filename == "" and "default" or filename);
+
+		NPL.load("(gl)script/apps/Aries/Creator/Game/Code/LanguageConfigurations.lua");
+		local LanguageConfigurations = commonlib.gettable("MyCompany.Aries.Game.Code.LanguageConfigurations");
+
+		local langConfig = LanguageConfigurations:LoadConfigByFilename(filename)
+		if(langConfig) then
+			if (langConfig.GetCategoryButtons) then
+				CodeHelpWindow.SetCategories(langConfig.GetCategoryButtons())
+			end
+			if (langConfig.GetAllCmds) then
+				CodeHelpWindow.SetAllCmds(langConfig.GetAllCmds());
+			end
+			if (langConfig.GetCodeExamples) then
+				CodeHelpWindow.AddCodeExamples(langConfig.GetCodeExamples());
+			end
+		end
 	end
+end
+
+-- public: 
+function CodeHelpWindow.SetAllCmds(all_cmds)
+	CodeHelpWindow.all_cmds = all_cmds;
+	CodeHelpWindow.AddCodeHelpItems(all_cmds);
 end
 
 function CodeHelpWindow.AddCodeHelpItems(all_cmds)
@@ -85,9 +136,6 @@ function CodeHelpWindow.GetCodeItemByName(name)
 	return all_command_names[name];
 end
 
-local page;
-CodeHelpWindow.currentItems = {};
-CodeHelpWindow.selected_code_name = nil;
 function CodeHelpWindow.OnInit()
 	page = document:GetPageCtrl();
 	CodeHelpWindow.InitCmds();
@@ -107,6 +155,10 @@ end
 
 function CodeHelpWindow.GetCategoryButtons()
 	return CodeHelpWindow.categories;
+end
+
+function CodeHelpWindow.GetAllCmds()
+	return CodeHelpWindow.all_cmds
 end
 
 function CodeHelpWindow.GetCurrentItems()
@@ -209,9 +261,65 @@ function CodeHelpWindow.OnDragEnd(name)
 		NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeBlockWindow.lua");
 		local CodeBlockWindow = commonlib.gettable("MyCompany.Aries.Game.Code.CodeBlockWindow");
 		if(CodeBlockWindow.IsMousePointerInCodeEditor()) then
-			CodeBlockWindow.InsertCodeAtCurrentLine(item:GetNPLCode(), not item:HasOutput());
+			if(CodeBlockWindow.IsBlocklyEditMode()) then
+				_guihelper.MessageBox(L"图块模式下不能直接编辑代码, 请用图块编辑器");
+			else
+				CodeBlockWindow.InsertCodeAtCurrentLine(item:GetNPLCode(), not item:HasOutput());
+			end
 		end
 	end
 end
 
+-- only used for paracraft book. 
+function CodeHelpWindow.GenerateWikiDocs(bSilent)
+	CodeHelpWindow.InitCmds()
+	local docs = {};
+	local categories = CodeHelpWindow.GetCategoryButtons()
+	for i=1, #categories do
+		local category = categories[i];
+		if(category) then
+			docs[#docs+1] = "### "..category.text;
+			docs[#docs+1] = "\n"
+
+			local items = category_items[category.name];
+			if(items) then
+				for i=1, #items do
+					local item = items[i];
+					local dsItem = item:GetDSItem();
+					if(dsItem) then
+						local code = item and item:GetNPLCode();
+						if(code) then
+							code = code:gsub("\r?\n%s*\r?\n", "\n")
+							local html = item:GetHtml() or ""
+							html = html:gsub("<div [^>]*>", "`"):gsub("</div>", "`")
+							html = html:gsub("<input .*value=\"([^\"]+)\"[^/]*/>", "`%1`")
+							docs[#docs+1] = "> "..html..": "..code;
+							if(not code:match("\n%s*$")) then
+								docs[#docs+1] = "\n"
+							end
+							docs[#docs+1] = "```lua\n"
+							local examples = item:GetNPLCodeExamples();
+							docs[#docs+1] = examples;
+							if(not examples:match("\n%s*$")) then
+								docs[#docs+1] = "\n"
+							end
+							docs[#docs+1] = "```\n"
+						end
+					end
+				end
+			end
+		end
+	end
+	local filename = "temp/codeblock_docs.txt"
+	local file = ParaIO.open(filename, "w");
+	if(file:IsValid()) then
+		LOG.std(nil, "info", "CodeHelpWindow", "wiki doc written to %s", filename);
+		local text = table.concat(docs, "");
+		file:WriteString(text, #text);
+		file:close();
+		if(not bSilent) then
+			_guihelper.MessageBox(format("wiki doc written to %s", filename))
+		end
+	end
+end
 CodeHelpWindow:InitSingleton();

@@ -15,6 +15,8 @@ local ParaWorldLessons = commonlib.gettable("MyCompany.Aries.Game.MainLogin.Para
 
 local ParaWorldLesson = commonlib.inherit(nil, commonlib.gettable("MyCompany.Aries.Game.MainLogin.ParaWorldLesson"))
 
+local KeepworkService = NPL.load("(gl)Mod/WorldShare/service/KeepworkService.lua");
+
 -- set this to true when keepwork `?token=` signin is fully supported. 
 ParaWorldLesson.autoSigninWebUrl = true;
 
@@ -105,7 +107,8 @@ function ParaWorldLesson:GetClientData()
 	return self.clientData;
 end
 
-function ParaWorldLesson:GetFirstWorldUrl()
+-- @param callbackFunc: function(worldUrl) end
+function ParaWorldLesson:GetFirstWorldUrl(callbackFunc)
 	if(not self.worldUrl) then
 		local url = ""; 
 		local paracraftMod = self.content:match("\n(```@[pP]aracraft[^`]+)");
@@ -116,11 +119,15 @@ function ParaWorldLesson:GetFirstWorldUrl()
 				if(not bInsideDownload and line:match("^download")) then
 					bInsideDownload = true;
 				elseif(bInsideDownload and line:match("^%s*link:")) then
-					url = line:match("(https?://[^\r\n]+)");
-					if(url) then
-						break
-					else
-						bSearchNextLine = true
+					line = line:match("^%s*link:%s*(.+)%s*$")
+					if(line) then
+						line = line:gsub("^['\"](.+)['\"]$", "%1");
+						url = line:match("(https?://[^\r\n]+)");
+						if(url) then
+							break
+						else
+							bSearchNextLine = true
+						end
 					end
 				elseif(bSearchNextLine) then
 					url = line:match("(https?://[^\r\n]+)");
@@ -128,7 +135,31 @@ function ParaWorldLesson:GetFirstWorldUrl()
 				end
 			end
 		end	
+		local projectMod = self.content:match("\n(```@[pP]roject[^`]+)");
+		if(projectMod and (not url or url=="")) then
+			for line in projectMod:gmatch("([^\r\n]+)\r?\n") do
+				local projectId = line:match("^%s*projectId:%s*(.+)%s*$")
+				if(projectId) then
+					projectId = projectId:gsub("^['\"](.+)['\"]$", "%1");
+					projectId = tonumber(projectId);
+					if(projectId) then
+						KeepworkService:GetWorldByProjectId(projectId, function(worldInfo)
+							if worldInfo and worldInfo.archiveUrl then
+								self.worldUrl = worldInfo.archiveUrl;
+							end
+							if(callbackFunc) then
+								callbackFunc(self.worldUrl)
+							end
+						end)
+					end
+				end
+			end
+			return self.worldUrl;
+		end
 		self.worldUrl = url;
+	end
+	if(callbackFunc) then
+		callbackFunc(self.worldUrl)
 	end
 	return self.worldUrl
 end
@@ -143,25 +174,29 @@ end
 
 function ParaWorldLesson:GetLessonUrl()
 	if(not self.lessonUrl) then
-		self.lessonUrl = format("https://keepwork.com/l/#/visitor/package/%d/lesson/%d", self:GetPackageId(), self:GetLessonId())
+		self.lessonUrl = format("%s/l/visitor/package/%d/lesson/%d", KeepworkService:GetKeepworkUrl(), self:GetPackageId(), self:GetLessonId())
 	end
 	return self.lessonUrl;
 end
 
+function ParaWorldLesson:HasOpenedUrl()
+	return self.hasOpenedUrl;
+end
+
 function ParaWorldLesson:OpenLessonUrl()
+	self.hasOpenedUrl = true;
 	local url = self:GetLessonUrl()
 	if(url) then
 		if(self:GetClassId()) then
 			self:OpenLessonUrlDirect();	
 		else
-			local LoginMain = NPL.load("(gl)Mod/WorldShare/cellar/Login/LoginMain.lua")
-			if(LoginMain.IsSignedIn()) then
-				self:OpenLessonUrlDirect();	
-			else
-				LoginMain.ShowLoginModal(function()
+			NPL.load("(gl)script/apps/Aries/Creator/Game/Login/ParaWorldLoginDocker.lua");
+			local ParaWorldLoginDocker = commonlib.gettable("MyCompany.Aries.Game.MainLogin.ParaWorldLoginDocker")
+			ParaWorldLoginDocker.SignIn(L"登陆后才能访问课程系统, 请先登录", function(bSucceed)
+				if(bSucceed) then
 					self:OpenLessonUrlDirect();	
-				end, L"登陆后才能访问课程系统, 请先登录");
-			end
+				end
+			end)
 		end
 	end
 end
@@ -224,27 +259,28 @@ end
 
 -- @param callbackFunc: function(bSucceed, localWorldPath)
 function ParaWorldLesson:EnterWorld(callbackFunc)
-	local worldUrl = self:GetFirstWorldUrl()
-	if(worldUrl) then
-		LOG.std(nil, "info", "ParaWorldLessons", "try entering world %s", worldUrl);
+	self:GetFirstWorldUrl(function(worldUrl) 
+		if(worldUrl and worldUrl~="") then
+			LOG.std(nil, "info", "ParaWorldLessons", "try entering world %s", worldUrl);
 
-		NPL.load("(gl)script/apps/Aries/Creator/Game/Login/DownloadWorld.lua");
-		local DownloadWorld = commonlib.gettable("MyCompany.Aries.Game.MainLogin.DownloadWorld")
-		DownloadWorld.ShowPage(worldUrl);
+			NPL.load("(gl)script/apps/Aries/Creator/Game/Login/DownloadWorld.lua");
+			local DownloadWorld = commonlib.gettable("MyCompany.Aries.Game.MainLogin.DownloadWorld")
+			DownloadWorld.ShowPage(worldUrl);
 
-		NPL.load("(gl)script/apps/Aries/Creator/Game/Login/RemoteWorld.lua");
-		local RemoteWorld = commonlib.gettable("MyCompany.Aries.Creator.Game.Login.RemoteWorld");
-		local world =RemoteWorld.LoadFromHref(worldUrl, "self");
+			NPL.load("(gl)script/apps/Aries/Creator/Game/Login/RemoteWorld.lua");
+			local RemoteWorld = commonlib.gettable("MyCompany.Aries.Creator.Game.Login.RemoteWorld");
+			local world =RemoteWorld.LoadFromHref(worldUrl, "self");
 
-		NPL.load("(gl)script/apps/Aries/Creator/Game/Login/InternetLoadWorld.lua");
-		local InternetLoadWorld = commonlib.gettable("MyCompany.Aries.Creator.Game.Login.InternetLoadWorld");
-		InternetLoadWorld.LoadWorld(world, nil, nil, function(bSucceed, localWorldPath)
-			DownloadWorld.Close();
-			if(callbackFunc) then
-				callbackFunc(bSucceed, localWorldPath);
-			end
-		end)
-	end
+			NPL.load("(gl)script/apps/Aries/Creator/Game/Login/InternetLoadWorld.lua");
+			local InternetLoadWorld = commonlib.gettable("MyCompany.Aries.Creator.Game.Login.InternetLoadWorld");
+			InternetLoadWorld.LoadWorld(world, nil, nil, function(bSucceed, localWorldPath)
+				DownloadWorld.Close();
+				if(callbackFunc) then
+					callbackFunc(bSucceed, localWorldPath);
+				end
+			end)
+		end
+	end)
 end
 
 function ParaWorldLesson:GetSummaryMCML()
@@ -267,7 +303,7 @@ function ParaWorldLesson:SendRecord()
 	local userId = self:GetUserId() or 0;
 	local learnAPIUrl;
 	if(self:GetRecordId()) then
-		learnAPIUrl = format("https://api.keepwork.com/lesson/v0/learnRecords/%d", self:GetRecordId());
+		learnAPIUrl = format("%s/lesson/v0/learnRecords/%d", KeepworkService:GetKeepworkUrl(), self:GetRecordId());
 		learnAPIUrl = self:BuildUrlWithToken(learnAPIUrl)
 		return ParaWorldLessons.UrlRequest(learnAPIUrl , "PUT", {id=userId, extra = self:GetClientData()}, function(err, msg, data)
 			LOG.std(nil, "debug", "ParaWorldLessons", "send record returned:", err);

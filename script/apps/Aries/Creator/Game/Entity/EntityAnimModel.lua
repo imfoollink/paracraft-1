@@ -269,7 +269,6 @@ end
 --@return {0, angleY, 0} of vector3d
 function Entity:ComputeModelFacing()
 	local x0,y0,z0 = self:GetBlockPos();
-	local x1,y1,z1;
 	local angle;
 	for side=0,5 do
 		local dx, dy, dz = Direction.GetOffsetBySide(side);
@@ -277,9 +276,6 @@ function Entity:ComputeModelFacing()
 		local block_id = ParaTerrain.GetBlockTemplateByIdx(x,y,z);
 		local block_data = ParaTerrain.GetBlockUserDataByIdx(x,y,z);
 		if( block_id~=0 and y >= y0) then
-			x1 = x;
-			y1 = y;
-			z1 = z;
 			angle = Direction.directionTo3DFacing[side]
 			break;
 		end
@@ -338,8 +334,8 @@ function Entity:AutoOrientBlocks(blocks)
 	local angles = self:ComputeModelFacing();
 	self:RotateBlocksByYAxis(blocks, angles[2]);
 
-	-- center blocks, block pos be 0.5, not standard blocks
-	self:CenterBlocks(blocks);
+	--self:OffsetBlocks(blocks, x0, y0, z0);
+	--self:CenterBlocks(blocks)
 end
 
 -- static script callback function

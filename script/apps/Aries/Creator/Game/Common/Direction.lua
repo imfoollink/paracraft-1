@@ -190,7 +190,7 @@ end
 
 function Direction.GetFacingFromOffset(dx, dy, dz)
 	local len = dx^2+dz^2;
-	if(len>0.01) then
+	if(len>0.0000001) then
 		len = math.sqrt(len)
 		local facing = math.acos(dx/len);
 		if(dz>0) then	
@@ -202,12 +202,23 @@ function Direction.GetFacingFromOffset(dx, dy, dz)
 	end
 end
 
+function Direction.GetPitchFromOffset(dx, dy, dz)
+	local len = dx^2+dy^2+dz^2;
+	if(len>0.0000001) then
+		len = math.sqrt(len)
+		local pitch = math.asin(dy/len);
+		return pitch;
+	else
+		return 0;
+	end
+end
+
 -- @return [0,5] based on camera position
 function Direction.GetDirection3DFromCamera(camx,camy,camz, lookat_x,lookat_y,lookat_z)
 	local dx, dy, dz = math3d.CameraToWorldSpace(0, 0 ,1, camx,camy,camz, lookat_x,lookat_y,lookat_z);
 	if(dy>0.4) then
 		return 5;
-	elseif(dy<-0.8) then
+	elseif(dy < -0.8) then
 		return 4;
 	elseif(math.abs(dz) > math.abs(dx)) then
 		if(dz>0) then

@@ -38,6 +38,7 @@ local math_random = math.random;
 local math_floor = math.floor;
 
 local Entity = commonlib.inherit(commonlib.gettable("MyCompany.Aries.Game.EntityManager.Entity"), commonlib.gettable("MyCompany.Aries.Game.EntityManager.EntityMovable"));
+Entity:Signal("clicked", function(mouse_button) end)
 
 -- class name
 Entity.class_name = "Movable";
@@ -244,6 +245,9 @@ function Entity:LoadFromXMLNode(node)
 	local attr = node.attr;
 	if(attr) then
 		self.skin = node.attr.skin;
+		if(self.skin) then
+			Files.FindFile(self.skin);
+		end
 		if(attr.scaling) then
 			self.scaling = tonumber(attr.scaling);
 		end
@@ -313,7 +317,6 @@ end
 -- set new skin texture by filename. 
 -- @param skin: if nil, it will use the default skin. 
 function Entity:SetSkin(skin)
-	skin = skin;
 	if(self.skin ~= skin) then
 		self.skin = skin;
 		if(skin) then
@@ -402,7 +405,7 @@ end
 
 -- Returns true if the entity takes up space in its containing block, such as animals,mob and players. 
 function Entity:CanBeCollidedWith(entity)
-    return not self:IsStaticBlocker();
+    return self:IsStaticBlocker();
 end
 
 -- Returns true if this entity should push and be pushed by other entities when colliding.
@@ -621,6 +624,9 @@ function Entity:OnClick(x, y, z, mouse_button)
 		local event = Event:new():init("onclick");	
 		event.button = mouse_button;
 		self:event(event);
+
+		-- signal
+		self:clicked(mouse_button);
 	end
 	return true;
 end

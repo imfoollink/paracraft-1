@@ -113,13 +113,13 @@ local options = commonlib.createtable("MyCompany.Aries.Game.GameLogic.options", 
 	fps_cursor = {file="Texture/blocks/Cursor/fps.png", hot_x=16, hot_y=16,},
 	hand_cursor = {file="Texture/blocks/Cursor/interaction.tga", hot_x=16, hot_y=16,},
 	-- picking distance
-	PickingDist = 6,
+	PickingDist = 50,
 	-- locking game mode
 	LockedGameMode = nil,
 	-- whether to enable left click to move in game mode. 
 	leftClickToMove = false,
 	ask_for_help_url = L"http://bbs.paraengine.com/forum.php?mod=forumdisplay&fid=51",
-	bbs_home_url = L"https://keepwork.com/official/creativeTimes/latest",
+	bbs_home_url = L"https://times.keepwork.com/latest",
 	--bbs_home_url = L"http://paracraft.keepwork.com/",
 	--bbs_upload_url = L"http://bbs.paraengine.com/forum.php?mod=forumdisplay&fid=50",
 	bbs_upload_url = L"https://tieba.baidu.com/f?kw=%E9%AD%94%E6%B3%95%E5%93%88%E5%A5%87",
@@ -222,13 +222,17 @@ function options:SetClickToContinue(bEnabled)
 	att:SetField("ToggleSoundWhenNotFocused", bEnabled);
 end
 
--- @param value: if nil, it will set back to 6. 
+-- @param value: if nil, it will set back to 50. 
 function options:SetPickingDist(value)
 	if(type(value) == "number") then
 		self.PickingDist = value;
 	else
-		self.PickingDist = 6;
+		self.PickingDist = 50;
 	end
+end
+
+function options:GetPickingDist()
+	return self.PickingDist or 50;
 end
 
 -- get current revision number
@@ -238,6 +242,16 @@ function options:GetRevision()
 	else
 		return 1;
 	end
+end
+
+-- keepwork project id
+function options:GetProjectId()
+	return WorldCommon.GetWorldTag("kpProjectId");
+end
+
+function options:GetNetworkInfo()
+	local att = NPL.GetAttributeObject();
+	return {TCP_HOST = att:GetField("HostIP"), TCP_PORT = att:GetField("HostPort"), UDP_HOST = att:GetField("UDPHostIP"), UDP_PORT = att:GetField("UDPHostPort")}
 end
 
 -- @param r,g,b: in [0,2] range
@@ -297,10 +311,6 @@ function options:OnLoadWorld()
 	GameLogic.AddBBS("options", nil);
 
 	local player = ParaScene.GetPlayer();
-	NPL.load("(gl)script/apps/Aries/Creator/Game/Common/Files.lua");
-	local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
-	Files:ClearFindFileCache();
-	
 	self:ApplyTexturePack();
 
 	-- load saved user settings
@@ -308,6 +318,7 @@ function options:OnLoadWorld()
 	self.LockedGameMode = nil;
 	self.NormalDensity = self.DefaultDensity;
 	self.AllowRunning = true;
+	self.PickingDist = 50;
 	self:SetViewBobbing(nil);
 	self:SetEnableVibration(nil);
 	self:SetDisableShaderCommand(nil);
@@ -1100,4 +1111,9 @@ function options:SetMaintainMovieBlockAspectRatio(value)
 		self.maintainMovieBlockAspectRatio = value;
 		GameLogic.GetPlayerController():SaveLocalData(key, value, true, false);
 	end
+end
+
+function options:SetFullScreenMode(bFullScreen)
+	ParaEngine.GetAttributeObject():SetField("IsFullScreenMode", bFullScreen == true);
+	ParaEngine.GetAttributeObject():CallField("UpdateScreenMode");
 end

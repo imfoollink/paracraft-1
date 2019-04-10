@@ -13,6 +13,8 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/Actor.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/MovieClipController.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/VideoRecorder.lua");
 NPL.load("(gl)script/apps/Aries/Creator/WorldCommon.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Movie/MovieChannel.lua");
+local MovieChannel = commonlib.gettable("MyCompany.Aries.Game.Movie.MovieChannel");
 local WorldCommon = commonlib.gettable("MyCompany.Aries.Creator.WorldCommon")
 local VideoRecorder = commonlib.gettable("MyCompany.Aries.Game.Movie.VideoRecorder");
 local MovieClipController = commonlib.gettable("MyCompany.Aries.Game.Movie.MovieClipController");
@@ -32,6 +34,7 @@ MovieManager:Signal("activeMovieClipChanged", function(clip) end);
 
 function MovieManager:ctor()
 	self.active_clips = commonlib.UnorderedArraySet:new();
+	self.actor_names = commonlib.OrderedArraySet:new();
 	GameLogic.GetFilters():add_filter("show", MovieManager.ShowFilter);
 end
 
@@ -45,6 +48,9 @@ function MovieManager:Reset()
 	self.current_movieclip = nil;
 	self.active_clips:clear();
 	self:activeMovieClipChanged(self.current_movieclip);
+	self.movieChannels = {};
+	self.actor_names:clear();
+	self.actor_names:add("player");
 end
 
 -- get the currently active movie clip
@@ -201,6 +207,15 @@ function MovieManager:RemoveMovieClip(movieclip)
 	end
 end
 
+function MovieManager:CreateGetMovieChannel(name)
+	local channel = self.movieChannels[name];
+	if(not channel) then
+		channel = MovieChannel:new():Init(name);
+		self.movieChannels[name] = channel;
+	end
+	return channel;
+end
+
 -- called every framemove. 
 -- @param deltaTime: in millisecond ticks
 function MovieManager:FrameMove(deltaTime)
@@ -210,4 +225,13 @@ function MovieManager:FrameMove(deltaTime)
 			movie_clip:FrameMove(deltaTime);	
 		end
 	end
+end
+
+-- return array of actor names
+function MovieManager:GetActorNames()
+	return self.actor_names;
+end
+
+function MovieManager:AddActorName(name)
+	self.actor_names:add(name);
 end

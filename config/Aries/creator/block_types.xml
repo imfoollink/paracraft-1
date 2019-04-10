@@ -155,7 +155,7 @@ Sound related:
   <block singleSideTex="true" name="Quartz_Slope" text="石英斜面" searchkey="" class="BlockSlope" id="263" mapcolor="#f3f2d3" step_sound="stone" texture="Texture/blocks/quartz_block_top.png" template="DataOnly" shape="slope" modelName="slope" cubeMode="true" obstruction="true" customModel="true" blockcamera="true" customBlockModel="true"/>
   
   <!--spot light, directional light, etc-->
-  <block singleSideTex="true" name="BlockLight" text="聚光灯" searchkey="" class="BlockLight" entity_clasCmdTextureReplacers="EntityLight" item_class="ItemLight"  light="true" torchLightValue="5"  id="264" texture="Texture/blocks/wool_colored_white.png" obstruction="false" cubeMode="true" template="carpet" />
+  <block singleSideTex="true" name="BlockLight" text="光源" searchkey="" class="BlockLight" entity_class="EntityLight" item_class="ItemLight"  icon="Texture/blocks/items/blaze_powder.png" id="264" texture="Texture/blocks/wool_colored_white.png" obstruction="false" />
   <block threeSideTex="true" name="Checkpoint" text="存盘点" searchkey="" class="BlockEntityBase" entity_class="EntityCheckpoint" id="265" hasAction="true" texture="Texture/blocks/doortop_three.png" mapcolor="#fdcc49" obstruction="true" solid="true" cubeMode="true" />
   
   <!--Added Xizhi 2018.7.2 added animation block-->
@@ -249,7 +249,7 @@ Sound related:
   <!--Added Xizhi 2017.6.4 added memory block-->
   <block singleSideTex="true" name="MemoryBlock" id="9" text="记忆方块" searchkey="记忆方块" class="BlockMemory" entity_class="EntityMemory" texture="Texture/blocks/command_block_on.png" hasAction="true" obstruction="true" solid="true" cubeMode="true"  />
   <!--Added Xizhi 2018.5.19 added code block-->
-  <block singleSideTex="true" name="CodeBlock" id="219" modelName="codeblock" text="代码方块" searchkey="代码方块" class="BlockCode" entity_class="EntityCode" texture="Texture/blocks/codeblock_on.png" texture2="Texture/blocks/codeblock_off.png" hasAction="true" obstruction="true" solid="true" cubeMode="true"  />
+  <block singleSideTex="true" name="CodeBlock" id="219" modelName="codeblock" text="代码方块" searchkey="代码方块" class="BlockCode" item_class="ItemCodeBlock" entity_class="EntityCode" texture="Texture/blocks/codeblock_on.png" texture2="Texture/blocks/codeblock_off.png" hasAction="true" obstruction="true" solid="true" cubeMode="true"  />
   
   <!--Added Xizhi 2014.2.12-->
   <block singleSideTex="true" name="CmdTextureReplacer" text="材质转换器" searchkey="材质转换器" id="223" class="BlockEntityBase" entity_class="EntityCmdTextureReplacer" hasAction="true" texture="Texture/blocks/command_block.png" icon="Texture/blocks/items/stonebrick_chiseled.png" cubeMode="true" obstruction="true" solid="true" />
@@ -508,6 +508,8 @@ Sound related:
   <block id="10066" name="QuestLog" text="任务日志" searchkey="任务日志" item_class="ItemBook" tooltip="" icon="Texture/blocks/items/book_writable.png"></block>
   <block id="10067" name="TerrainBrush" text="地形笔刷" item_class="ItemTerrainBrush" tooltip="" icon="Texture/blocks/items/raise.png"></block>
   <block id="10068" name="PaintBrush" text="画笔" item_class="ItemPaintBrush" tooltip="" icon="Texture/blocks/items/brush.png"></block>
+  <block id="10069" name="CodeActor" text="代码演员" searchkey="代码演员" item_class="ItemCodeActor" tooltip="代码演员" icon="Texture/blocks/items/ts_char_off.png"></block>
+  <block id="10070" name="CodeActorInstance" text="代码演员实例" item_class="ItemCodeActorInstance" tooltip="代码演员实例" icon="Texture/blocks/items/ts_char_off.png"></block>
   
   <!--怪物和动物： id: 20000-20999-->
   <block id="20001" name="simple_mob" text="怪物" searchkey="怪物" tooltip="" item_class="ItemMob" icon="character/CC/03animals/treemonster/treemonster.x.png" gold_count="5" hp="100" respawn_time="300000">

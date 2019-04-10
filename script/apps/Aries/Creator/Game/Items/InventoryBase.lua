@@ -150,6 +150,17 @@ function InventoryBase:GetCurrentItemIndex()
 	return 1;
 end
 
+function InventoryBase:IsFull()
+	local slots = self.slots;
+	for i=1, self:GetSlotCount() do
+		local item = slots[i];
+		if(not item or item.count == 0) then
+			return false
+		end
+	end
+	return true;
+end
+
 -- auto add item_stack to a free slot or merge with existing stack.
 -- @param from_slot_id: start from a given slot. if nil, it will search from beginning. 
 -- @return bAllAdded, slot_index: true if placed, false if impossible or only part of the item_stack is placed. 
@@ -178,6 +189,15 @@ function InventoryBase:AddItem(item_stack, from_slot_id, to_slot_id)
 	return false;
 end
 
+-- @return slotIndex, please note it has to be a perfect match by reference (NOT by value)
+function InventoryBase:GetItemStackIndex(itemStack)
+	local slots = self.slots;
+	for i=1, self:GetSlotCount() do
+		if(slots[i] == itemStack) then
+			return i;
+		end
+	end
+end
 
 -- find a given item in slots. return the first one matched. 
 -- @param item_id:
@@ -311,11 +331,12 @@ function InventoryBase:OnInventoryChanged(slot_index)
 		pe_mc_slot.RefreshBlockIcons(self);
 	end
 	if(self.OnChangedCallback) then
-		self.OnChangedCallback(self);
+		self.OnChangedCallback(self, slot_index);
 	end
 end
 
--- a custom user defined function for OnInventoryChanged(self)
+-- a custom user defined function for OnInventoryChanged(self, slot_index)
+-- slot_index: if only one slot is changed, this is the index. it could be nil, if index can not be determined. 
 function InventoryBase:SetOnChangedCallback(callbackfunc)
 	self.OnChangedCallback = callbackfunc;
 end
@@ -333,10 +354,15 @@ function InventoryBase:Close()
 end
 
 function InventoryBase:LoadFromXMLNode(node)
+	local count = 0;
 	for slot_index, subnode in ipairs(node) do
 		if(subnode.attr and subnode.attr.count) then
 			self.slots[slot_index] = ItemStack:new():LoadFromXMLNode(subnode);
+			count = slot_index;
 		end
+	end
+	if(self:GetSlotCount() < count) then
+		self:SetSlotCount(count)
 	end
 end
 
