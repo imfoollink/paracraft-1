@@ -64,7 +64,7 @@ local var_name_to_text = {
 	parent = L"父链接",
 	color = L"颜色",
 	code = L"代码",
-	emoji = L"表情"
+	emoji = L"表情",
 	static = L"静态属性",
 }
 local var_longname_to_text = {
