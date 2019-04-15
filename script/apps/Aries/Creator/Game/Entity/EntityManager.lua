@@ -799,6 +799,7 @@ function EntityManager.FrameMoveQueueThisFrame(deltaTime, cur_time, destroy_list
 		local entity = framemove_queue[i];
 		entity:CheckFrameMove(deltaTime, cur_time, true);
 	end
+	framemove_queue = {}
 	framemove_queue_size = 0;
 end
 
