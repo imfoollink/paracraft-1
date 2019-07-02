@@ -157,7 +157,9 @@ end
 function ItemBlockModel:OnClickInHand(itemStack, entityPlayer)
 	-- if there is selected blocks, we will replace selection with current block in hand. 
 	if(GameLogic.GameMode:IsEditor() and entityPlayer == EntityManager.GetPlayer()) then
-		self:SelectModelFile(itemStack);
+		-- self:SelectModelFile(itemStack);
+		ItemBlockModel._super.OnSelect(self, itemStack);
+
 	end
 end
 
@@ -184,7 +186,7 @@ end
 
 -- virtual function: when selected in right hand
 function ItemBlockModel:OnSelect(itemStack)
-	ItemBlockModel._super.OnSelect(self, itemStack);
+	-- ItemBlockModel._super.OnSelect(self, itemStack);
 	GameLogic.SetStatus(L"Ctrl+左键选择方块与骨骼, 左键点击物品图标保存模型");
 end
 
