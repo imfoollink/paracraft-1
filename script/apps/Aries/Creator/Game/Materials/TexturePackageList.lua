@@ -390,7 +390,7 @@ function TexturePackageList.GetPackageFuzzyMatch(utf8_filename)
 		LOG.std(nil, "info", "TexturePackageList", "rough matching %s with %s", utf8_filename, package.name_r1 or "");
 		return package;
 	else
-		LOG.std(nil, "info", "TexturePackageList", "no package found for %s. using the default one", utf8_filename);
+		LOG.std(nil, "info", "TexturePackageList", "no package found for %s. using the default one", utf8_filename or "");
 		return TexturePackageList.GetDefaultTexturePackage();
 	end
 end
