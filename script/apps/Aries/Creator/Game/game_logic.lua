@@ -141,6 +141,7 @@ local game_level;
 -- right hand block template id. 
 GameLogic.right_hand_block_id = 1;
 
+GameLogic.autoBackupInterval = 1000*60*10; -- 10 minutes
 GameLogic.picking_dist = options.picking_dist_walkmode;
 
 local SentientGroupIDs = commonlib.gettable("MyCompany.Aries.Game.GameLogic.SentientGroupIDs");
@@ -216,6 +217,8 @@ end
 
 -- called by both Init() and StaticInit()
 function GameLogic.InitCommon()
+    math.randomseed(ParaGlobal.GetGameTime());
+
     NPL.load("(gl)script/apps/Aries/Creator/Game/APISandbox/CreatorAPISandbox.lua");
     local CreatorAPISandbox = commonlib.gettable("MyCompany.Aries.Game.APISandbox.CreatorAPISandbox");
     CreatorAPISandbox.Cleanup();
@@ -641,7 +644,7 @@ function GameLogic.RemoveWorldFileWatcher()
 end
 
 function GameLogic.CheckCreateFileWatcher()
-    if(not GameLogic.IsReadOnly()) then
+    if(not GameLogic.IsReadOnly() or GameLogic.isRemote) then
         NPL.load("(gl)script/ide/FileSystemWatcher.lua");
 
         GameLogic.RemoveWorldFileWatcher();
@@ -729,6 +732,8 @@ function GameLogic.SaveAll(bSaveToLastSaveFolder,saveCallBack)
     if(not GameLogic.world_revision:Commit()) then
         GameLogic.world_revision:Backup();
         GameLogic.world_revision:Commit(true);
+    elseif(GameLogic.world_revision:GetNonBackupTime() > GameLogic.autoBackupInterval) then
+        GameLogic.world_revision:Backup();
     end
 
     GameLogic.options:SetLastSaveTime();
@@ -833,7 +838,7 @@ function GameLogic.Exit()
     MovieManager:Exit();
 
     if(GameLogic.world_revision) then
-        if(GameLogic.world_revision:IsModified()) then
+        if(GameLogic.world_revision:IsModifiedAndNotBackedup()) then
             echo(" stop GameLogic.world_revision:Backup() temporarily");
             -- always backup on exit when modified. 
             -- stop using temporarily ↓↓↓↓↓↓↓
@@ -1092,7 +1097,7 @@ end
 
 -- whether we can collect items when player hit it. 
 function GameLogic.CanCollectItem()
-    if(GameLogic.IsReadOnly() or GameMode:CanCollectItem()) then
+    if(GameMode:CanCollectItem()) then
         return true;
     end
 end

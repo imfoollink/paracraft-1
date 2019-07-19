@@ -68,9 +68,13 @@ Commands["menu"] = {
 			end
 		elseif(name == "file.saveworld") then
 			if(System.options.mc) then
-				NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/SaveWorldPage.lua");
-				local SaveWorldPage = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.Areas.SaveWorldPage");
-				SaveWorldPage.ShowPage()
+				if(GameLogic.IsReadOnly()) then
+					GameLogic.RunCommand("/menu file.saveworldas");
+				else
+					NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/SaveWorldPage.lua");
+					local SaveWorldPage = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.Areas.SaveWorldPage");
+					SaveWorldPage.ShowPage()
+				end
 			else
 				NPL.load("(gl)script/apps/Aries/Creator/Game/GameMarket/SaveWorldPage.lua");
 				local SaveWorldPage = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.SaveWorldPage");
@@ -126,6 +130,11 @@ Commands["menu"] = {
 			NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/TeleportListPage.lua");
 			local TeleportListPage = commonlib.gettable("MyCompany.Aries.Game.GUI.TeleportListPage");
 			TeleportListPage.ShowPage(nil, true);
+		elseif(name == "window.find") then
+			NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/FindBlockTask.lua");
+			local FindBlockTask = commonlib.gettable("MyCompany.Aries.Game.Tasks.FindBlockTask");
+			local task = MyCompany.Aries.Game.Tasks.FindBlockTask:new()
+			task:Run();
 		elseif(name == "window.changeskin") then
 			NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/SkinPage.lua");
 			local SkinPage = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.SkinPage");
@@ -153,7 +162,11 @@ Commands["menu"] = {
 			local TeacherAgent = commonlib.gettable("MyCompany.Aries.Creator.Game.Teacher.TeacherAgent");
 			TeacherAgent:SetEnabled(not TeacherAgent:IsEnabled())
 		elseif(name == "help.videotutorials") then
-			GameLogic.RunCommand("/open https://keepwork.com/official/paracraft/animation-tutorials");
+			GameLogic.RunCommand("/open "..L"https://keepwork.com/official/docs/videoguide");
+		elseif(name == "help.learn") then
+			GameLogic.RunCommand("/open "..L"https://keepwork.com/s");
+		elseif(name == "help.ask") then
+			GameLogic.RunCommand("/open "..L"https://keepwork.com/official/docs/FAQ/paracraft");
 		elseif(name == "help.lessons") then
 			GameLogic.RunCommand("/open "..L"https://keepwork.com/kecheng/cs/all");
 		elseif(name == "help.npl_code_wiki") then

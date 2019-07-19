@@ -698,6 +698,7 @@ function CodeBlock:RegisterAnimationEvent(time, callbackFunc)
 			return (time == curTime);
 		end);
 		event:SetFunction(callbackFunc);
+		return event;
 	end
 end
 
@@ -807,6 +808,32 @@ function CodeBlock:RegisterKeyPressedEvent(keyname, callbackFunc)
 	GameLogic.GetCodeGlobal():RegisterKeyPressedEvent(onEvent_);
 end
 
+-- if last tick event is not finished, the tick is ignored. 
+-- @param ticks: default to 1 tick
+function CodeBlock:RegisterTickEvent(ticks, callbackFunc)
+	ticks = tonumber(ticks or 1);
+	local event = self:CreateEvent("onTick");
+	event:SetIsFireForAllActors(true);
+	event:SetFunction(callbackFunc);
+	event:SetStopLastEvent(false);
+	local tick = 1;
+	local function onEvent_(_, msg)
+		tick = tick + 1;
+		if((tick % ticks) == 0) then
+			event:Fire(msg and msg.msg, msg and msg.onFinishedCallback, true);
+		end
+	end
+	
+	event.UnRegisterTextEvent = function()
+		GameLogic.GetCodeGlobal():UnregisterTextEvent("onTick", onEvent_);
+	end
+	
+	event:Connect("beforeDestroyed", event.UnRegisterTextEvent);
+	GameLogic.GetCodeGlobal():RegisterTextEvent("onTick", onEvent_);
+	
+	return event;
+end
+
 
 function CodeBlock:RegisterTextEvent(text, callbackFunc)
 	local event = self:CreateEvent("onText"..text);
@@ -815,10 +842,35 @@ function CodeBlock:RegisterTextEvent(text, callbackFunc)
 	local function onEvent_(_, msg)
 		event:Fire(msg and msg.msg, msg and msg.onFinishedCallback);
 	end
-	event:Connect("beforeDestroyed", function()
+	
+	event.UnRegisterTextEvent = function()
 		GameLogic.GetCodeGlobal():UnregisterTextEvent(text, onEvent_);
-	end)
+	end
+	
+	event:Connect("beforeDestroyed", event.UnRegisterTextEvent);
 	GameLogic.GetCodeGlobal():RegisterTextEvent(text, onEvent_);
+	
+	return event;
+end
+
+function CodeBlock:UnRegisterTextEvent(text, callbackFunc)
+	local eventname = "onText"..text;
+	local events = self.events[eventname];
+	
+	for i, event in ipairs(events) do
+		if event.callbackFunc == callbackFunc then
+			if(event.UnRegisterTextEvent) then
+				event.UnRegisterTextEvent();
+			end
+			event:Destroy();
+			table.remove(events, i);
+			break;
+		end
+	end
+	
+	if #events == 0 then
+		self.events[eventname] = nil;
+	end
 end
 
 -- @param onFinishedCallback: can be nil
@@ -935,7 +987,7 @@ function CodeBlock:RunTempCode(code, filename)
 			local co = CodeCoroutine:new():Init(self);
 			self.lastTempCodeCoroutine = co;
 			self:stateChanged();
-			local actor = env.actor or self:FindNearbyActor() or self:CreateActor();
+			local actor = self:FindNearbyActor() or self:CreateActor();
 			co:SetActor(actor);
 			co:SetFunction(code_func);
 			co:Run()
@@ -1026,8 +1078,13 @@ function CodeBlock:IncludeFile(filename)
 				self:send_message(msg, "error");
 			else
 				setfenv(code_func, self:GetCodeEnv());
-				local ok, result = xpcall(code_func, CodeBlock.handleError);
+				--local ok, result = xpcall(code_func, CodeBlock.handleError);
+				local arg = {xpcall(code_func, CodeBlock.handleError)};
+				local ok = arg[1];
+				
 				if(not ok) then
+					local result = arg[2];
+					
 					if(result:match("_stop_all_")) then
 						self:StopAll();
 					elseif(result:match("_restart_all_")) then
@@ -1038,6 +1095,8 @@ function CodeBlock:IncludeFile(filename)
 						self:send_message(msg, "error");
 					end
 				end
+				
+				return unpack(arg, 2);
 			end
 		end
 	else

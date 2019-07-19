@@ -26,6 +26,7 @@ local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
 local Desktop = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop");
 local ItemStack = commonlib.gettable("MyCompany.Aries.Game.Items.ItemStack");
 local BroadcastHelper = commonlib.gettable("CommonCtrl.BroadcastHelper");
+local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
 
 local rshift = mathlib.bit.rshift;
 local lshift = mathlib.bit.lshift;
@@ -526,11 +527,14 @@ function NetClientHandler:handleMobSpawn(packet_MobSpawn)
 	elseif(entity_type == 13) then
 		spawnedEntity = EntityManager.EntityItem:new():Init(x,y,z, ItemStack:new():Init(packet_MobSpawn.item_id,1));
 		LOG.std(nil, "debug", "client::handleMobSpawn", "item: %d", packet_MobSpawn.item_id or -1);
-	elseif(entity_type == 14) then 
+	elseif(entity_type == 14) then
+		spawnedEntity = EntityManager.EntityCollectable:Create({x=x,y=y,z=z, item_id = packet_MobSpawn.item_id or block_types.names["gold_coin"]});
+		LOG.std(nil, "debug", "client::handleMobSpawn", "Collectable: %d", packet_MobSpawn.item_id or -1);
+	elseif(entity_type == 99) then 
 		NPL.load("script/Truck/Game/Entity/EntityNPCOnline.lua")
 		local EntityNPCOnline = commonlib.gettable("Mod.Truck.Game.EntityNPCOnline")
 		spawnedEntity = EntityNPCOnline:new():Create({x=x,y=y,z=z, item_id = packet_MobSpawn.item_id or block_types.names["villager"]});
-	elseif(entity_type == 15) then 
+	elseif(entity_type == 98) then 
 		NPL.load("(gl)script/Truck/Game/Entity/EntityHomePointOnline.lua");
 		local EntityHomePointOnline = commonlib.gettable("MyCompany.Aries.Game.EntityManager.EntityHomePointOnline")
 		spawnedEntity = EntityHomePointOnline:new():Create({x = x, y = y, z = z, item_id = block_types.names["player_spawn_point"], name = "player_spawn_point"})
@@ -638,6 +642,32 @@ function NetClientHandler:handleClientCommand(packet_ClientCommand)
 	end
 end
 
+-- server replied with a file
+function NetClientHandler:handleGetFile(packet_GetFile)
+	if(packet_GetFile.filename and packet_GetFile.data) then
+		if(packet_GetFile.data ~= "") then
+			local filename = Files.GetWorldFilePath(packet_GetFile.filename)
+			if(filename) then
+				local file = ParaIO.open(filename, "w")
+				if(file:IsValid()) then
+					file:WriteString(packet_GetFile.data, #(packet_GetFile.data));
+					file:close();
+					LOG.std(nil, "info", "NetClientHandler", "world file received and saved to %s", filename)
+				end
+			end
+		end
+	end
+end
+
+function NetClientHandler:handlePutFile(packet_PutFile)
+	if(packet_PutFile.filename and not packet_PutFile.data) then
+		local filename = Files.WorldPathToFullPath(packet_PutFile.filename)
+		if(ParaIO.DoesFileExist(filename, true)) then
+			-- only request from server if file is already used. 
+			self:AddToSendQueue(Packets.PacketGetFile:new():Init(packet_PutFile.filename));		
+		end
+	end
+end
 
 function NetClientHandler:handleSetScript(packet)
 	NPL.load("(gl)script/Truck/Independent/Independent.lua");

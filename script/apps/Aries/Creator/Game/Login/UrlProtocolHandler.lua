@@ -103,7 +103,7 @@ function UrlProtocolHandler:HasUrlProtocol(protocol_name,app_name)
 end
 
 function UrlProtocolHandler:CheckInstallUrlProtocol()
-	if(System.os.GetPlatform() == "win32" and not (System.options and System.options.isFromQQHall)) then
+	if(System.os.GetPlatform() == "win32" and not (System.options and (System.options.isFromQQHall or System.options.isSchool))) then
 		if(self:HasUrlProtocol()) then
 			return true;
 		else
@@ -113,5 +113,7 @@ function UrlProtocolHandler:CheckInstallUrlProtocol()
 				end
 			end, _guihelper.MessageBoxButtons.YesNo);
 		end	
+	else
+		LOG.std(nil, "info", "Url protocol", "skipped because of qq or school mode");
 	end
 end

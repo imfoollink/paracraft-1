@@ -57,6 +57,7 @@ function DesktopMenu.LoadMenuItems(bForceReload)
 				{text = L"粘贴(Ctrl+V)",name = "edit.paste",onclick=nil},
 				{text = L"删除(Del)",name = "edit.delete",onclick=nil},
 				{Type = "Separator"},
+				{text = L"搜索...(Ctrl+F)",name = "window.find",onclick=nil},
 				{text = L"Goto Next(F2)",name = "edit.goto",onclick=nil},
 				{text = L"Goto Prev(Shift+F2)",name = "edit.goto",onclick=nil},
 				{text = L"向上一层(Tab)",name = "edit.upstairs",onclick=nil},
@@ -71,7 +72,6 @@ function DesktopMenu.LoadMenuItems(bForceReload)
 		},
 		{text = L"窗口", order=5, mode="edit", name = "window",children = 
 			{
-				{text = L"创作百科...",name = "window.template", onclick=nil},
 				{text = L"换装...",name = "window.changeskin", onclick=nil},
 				{Type = "Separator"},
 				{text = L"信息(F3)",name = "window.info",onclick=nil},
@@ -85,7 +85,8 @@ function DesktopMenu.LoadMenuItems(bForceReload)
 		{text = L"帮助", order=6, name = "help",children = 
 			{
 				{text = L"教学视频",name = "help.videotutorials", onclick=nil},
-				{text = L"在线课程",name = "help.lessons", onclick=nil},
+				{text = L"学习",name = "help.learn", onclick=nil},
+				{text = L"提问",name = "help.ask", onclick=nil},
 				{Type = "Separator"},
 				-- {text = L"操作提示(F1)",name = "help.actiontutorial", onclick=nil},
 				{text = L"帮助...(F1)",name = "help.help", onclick=nil},

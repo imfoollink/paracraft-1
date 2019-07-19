@@ -18,6 +18,10 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/SceneContext/AllContext.lua");
 NPL.load("(gl)script/ide/System/Windows/Screen.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Code/CodeHelpWindow.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/EditCodeActor/EditCodeActor.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/NplBrowser/NplBrowserLoaderPage.lua");
+NPL.load("(gl)script/apps/WebServer/WebServer.lua");
+NPL.load("(gl)script/ide/System/Windows/Keyboard.lua");
+local Keyboard = commonlib.gettable("System.Windows.Keyboard");
 local EditCodeActor = commonlib.gettable("MyCompany.Aries.Game.Tasks.EditCodeActor");
 local CodeHelpWindow = commonlib.gettable("MyCompany.Aries.Game.Code.CodeHelpWindow");
 local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
@@ -26,6 +30,7 @@ local BlockEngine = commonlib.gettable("MyCompany.Aries.Game.BlockEngine")
 local AllContext = commonlib.gettable("MyCompany.Aries.Game.AllContext");
 local Mouse = commonlib.gettable("System.Windows.Mouse");
 local ViewportManager = commonlib.gettable("System.Scene.Viewports.ViewportManager");
+local NplBrowserLoaderPage = commonlib.gettable("NplBrowser.NplBrowserLoaderPage");
 local CodeBlockWindow = commonlib.inherit(commonlib.gettable("System.Core.ToolBase"), commonlib.gettable("MyCompany.Aries.Game.Code.CodeBlockWindow"));
 
 -- when entity being edited is changed. 
@@ -43,6 +48,9 @@ function CodeBlockWindow.Show(bShow)
 	if(not bShow) then
 		CodeBlockWindow.Close();
 	else
+        GameLogic.GetFilters():add_filter("OnShowEscFrame", CodeBlockWindow.OnShowEscFrame);
+		GameLogic.GetFilters():add_filter("ShowExitDialog", CodeBlockWindow.OnShowExitDialog);
+		
 		GameLogic:desktopLayoutRequested("CodeBlockWindow");
 		GameLogic:Connect("desktopLayoutRequested", CodeBlockWindow, CodeBlockWindow.OnLayoutRequested, "UniqueConnection");
 		GameLogic.GetCodeGlobal():Connect("logAdded", CodeBlockWindow, CodeBlockWindow.AddConsoleText, "UniqueConnection");
@@ -53,9 +61,6 @@ function CodeBlockWindow.Show(bShow)
 			_this = ParaUI.CreateUIObject("container", code_block_window_name, "_mr", 0, self.top, self.width, self.bottom);
 			_this.zorder = -2;
 			_this.background="";
-			local refreshTimer = commonlib.Timer:new({callbackFunc = function(timer)
-				CodeBlockWindow.Show(true)
-			end})
 			_this:SetScript("onsize", function()
 				CodeBlockWindow:OnViewportChange();
 			end)
@@ -78,9 +83,22 @@ function CodeBlockWindow.Show(bShow)
 		viewport:SetMarginRightHandler(self);
 
 		GameLogic:Connect("beforeWorldSaved", CodeBlockWindow, CodeBlockWindow.OnWorldSave, "UniqueConnection");
+		GameLogic:Connect("WorldUnloaded", CodeBlockWindow, CodeBlockWindow.OnWorldUnload, "UniqueConnection")
 
 		CodeBlockWindow:LoadSceneContext();
 	end
+end
+
+function CodeBlockWindow.OnShowEscFrame(bShow)
+	if(bShow or bShow == nil) then
+		CodeBlockWindow.SetNplBrowserVisible(false)
+	end
+	return bShow;
+end
+
+function CodeBlockWindow.OnShowExitDialog(p1)
+	CodeBlockWindow.SetNplBrowserVisible(false);
+	return p1;
 end
 
 function CodeBlockWindow:OnLayoutRequested(requesterName)
@@ -129,10 +147,13 @@ function CodeBlockWindow:OnViewportChange()
 				CodeBlockWindow.UpdateCodeToEntity();
 				page:Rebuild();
 			end
-
-			CodeBlockWindow.UpdateBlocklyWindowSize();
 		end
+
 	end
+end
+
+function CodeBlockWindow.OnWorldUnload()
+	self.lastBlocklyUrl = nil;
 end
 
 function CodeBlockWindow.OnWorldSave()
@@ -152,6 +173,15 @@ end
 
 function CodeBlockWindow:OnEntityRemoved()
 	CodeBlockWindow.SetCodeEntity(nil);
+end
+
+function CodeBlockWindow:OnCodeChange()
+	if(not CodeBlockWindow.IsVisible()) then
+		CodeBlockWindow.SetCodeEntity(nil);
+	end
+	if(page) then
+		page:Refresh(0.01);
+	end
 end
 
 function CodeBlockWindow.RestoreCursorPosition()
@@ -175,6 +205,7 @@ function CodeBlockWindow.SetCodeEntity(entity)
 		if(entity) then
 			entity:Connect("beforeRemoved", self, self.OnEntityRemoved, "UniqueConnection");
 			entity:Connect("editModeChanged", self, self.UpdateEditModeUI, "UniqueConnection");
+			entity:Connect("remotelyUpdated", self, self.OnCodeChange, "UniqueConnection");
 		end
 		if(self.entity) then
 			local codeBlock = self.entity:GetCodeBlock();
@@ -186,6 +217,7 @@ function CodeBlockWindow.SetCodeEntity(entity)
 
 			self.entity:Disconnect("beforeRemoved", self, self.OnEntityRemoved);
 			self.entity:Disconnect("editModeChanged", self, self.UpdateEditModeUI);
+			self.entity:Disconnect("remotelyUpdated", self, self.OnCodeChange);
 			CodeBlockWindow.UpdateCodeToEntity();
 		end
 		self.entity = entity;
@@ -267,12 +299,9 @@ end
 
 function CodeBlockWindow.Close()
 	GameLogic.GetCodeGlobal():Disconnect("logAdded", CodeBlockWindow, CodeBlockWindow.AddConsoleText);
-	if(CodeBlockWindow.isBlocklyOpened) then
-		CodeBlockWindow.CloseBlocklyWindow();
-		return
-	end
 	CodeBlockWindow:UnloadSceneContext();
 	CodeBlockWindow.CloseEditorWindow();
+	CodeBlockWindow.lastBlocklyUrl = nil;
 end
 
 function CodeBlockWindow.CloseEditorWindow()
@@ -309,7 +338,9 @@ function CodeBlockWindow.UpdateCodeToEntity()
 	if(page and entity) then
 		local code = page:GetUIValue("code");
 		if(not entity:IsBlocklyEditMode()) then
+			entity:BeginEdit()
 			entity:SetNPLCode(code);
+			entity:EndEdit()
 
 			local ctl = CodeBlockWindow.GetTextControl();
 			if(ctl) then
@@ -507,6 +538,7 @@ function CodeBlockWindow.OnChangeModel()
 				end
 			end);
 		end
+		CodeBlockWindow.SetNplBrowserVisible(false)
 	end
 end
 
@@ -527,12 +559,13 @@ function CodeBlockWindow.IsMousePointerInCodeEditor()
 	end
 end
 
+-- @return textcontrol, multilineEditBox control.
 function CodeBlockWindow.GetTextControl()
 	if(page) then
 		local textAreaCtrl = page:FindControl("code");
 		local textCtrl = textAreaCtrl and textAreaCtrl.ctrlEditbox;
 		if(textCtrl) then
-			return textCtrl:ViewPort();
+			return textCtrl:ViewPort(), textCtrl;
 		end
 	end
 end
@@ -583,9 +616,11 @@ end
 function CodeBlockWindow.UpdateBlocklyCode(blockly_xmlcode, code, bx, by, bz)
 	local codeEntity = CodeBlockWindow.GetCodeEntity(bx, by, bz);
 	if(codeEntity) then
+		codeEntity:BeginEdit()
 		codeEntity:SetBlocklyEditMode(true);
 		codeEntity:SetBlocklyXMLCode(blockly_xmlcode);
 		codeEntity:SetBlocklyNPLCode(code);
+		codeEntity:EndEdit()
 
 		if(CodeBlockWindow.IsSameBlock(bx, by, bz)) then
 			CodeBlockWindow.ReplaceCode(code, bx, by, bz)
@@ -634,49 +669,6 @@ function CodeBlockWindow.InsertCodeAtCurrentLine(code, forceOnNewLine, bx, by, b
 	end
 end
 
-local blocklyWndName = "blocklyWindow";
-
-function CodeBlockWindow.GetChromeBrowserManager()
-	if(self.chromeBrowserManager == nil) then
-		self.chromeBrowserManager = false;
-		NPL.load("(gl)Mod/NplCefBrowser/NplCefBrowserManager.lua");
-		local NplCefBrowserManager = commonlib.gettable("Mod.NplCefBrowserManager");	
-		if(NplCefBrowserManager.HasCefPlugin and NplCefBrowserManager:HasCefPlugin()) then
-			self.chromeBrowserManager = NplCefBrowserManager;
-		end
-	end
-	return self.chromeBrowserManager;
-end
-
--- @param bDestroy: true to destroy window
-function CodeBlockWindow.CloseBlocklyWindow(bDestroy)
-	CodeBlockWindow.isBlocklyOpened = false;
-	local NplCefBrowserManager = CodeBlockWindow.GetChromeBrowserManager();
-	if(NplCefBrowserManager) then
-		local config = NplCefBrowserManager:GetWindowConfig(blocklyWndName);
-		if(config) then
-			if(not bDestroy) then
-				config.visible = false;
-				NplCefBrowserManager:Show(config);
-			else
-				NplCefBrowserManager:Delete({id = blocklyWndName, });
-			end
-		end
-	end
-end
-
-function CodeBlockWindow.UpdateBlocklyWindowSize()
-	if(CodeBlockWindow.isBlocklyOpened) then
-		local NplCefBrowserManager = CodeBlockWindow.GetChromeBrowserManager();
-		if(NplCefBrowserManager) then
-			local config = NplCefBrowserManager:GetWindowConfig(blocklyWndName);
-			if(config) then
-				NplCefBrowserManager:ChangePosSize({id = blocklyWndName, x = 0, y = 0, width = math.max(400, Screen:GetWidth()-self.width+205), height = Screen:GetHeight(), });
-			end
-		end
-	end
-end
-
 function CodeBlockWindow.IsBlocklyEditMode()
 	local entity = CodeBlockWindow.GetCodeEntity()
 	if(entity) then
@@ -694,7 +686,6 @@ function CodeBlockWindow.UpdateCodeEditorStatus()
 	if(entity) then
 		CodeHelpWindow.SetLanguageConfigFile(entity:GetLanguageConfigFile());
 	end
-    CodeBlockWindow.SetNplBrowserVisible(CodeBlockWindow.IsBlocklyEditMode());
 end
 
 -- default to standard NPL language. One can create domain specific language configuration files. 
@@ -748,38 +739,82 @@ function CodeBlockWindow.OnClickEditMode(name)
 		if(name == "blockMode") then
 			CodeBlockWindow.UpdateCodeToEntity();
 			entity:SetBlocklyEditMode(true);
-			CodeBlockWindow.UpdateCodeEditorStatus()
+			CodeBlockWindow.UpdateCodeEditorStatus();
 		end
 	end
 	if(mouse_button == "right") then
 		CodeBlockWindow.OnClickSelectLanguageSettings()
 	end
 	if(name == "blockMode") then
-		CodeBlockWindow.OpenBlocklyEditor()
+		CodeBlockWindow.OpenBlocklyEditor();
 	end
 end
 
 function CodeBlockWindow.UpdateEditModeUI()
-	if(page) then
+	local textCtrl, multiLineCtrl = CodeBlockWindow.GetTextControl();
+	if(page and textCtrl) then
 		if(CodeBlockWindow.IsBlocklyEditMode()) then
 			_guihelper.SetUIColor(page:FindControl("blockMode"), "#0b9b3a")
 			_guihelper.SetUIColor(page:FindControl("codeMode"), "#808080")
+			if(CodeBlockWindow.IsNPLBrowserVisible()) then
+				CodeBlockWindow.SetNplBrowserVisible(true);
+			end
+			multiLineCtrl:SetBackgroundColor("#cccccc")
+			local tipCtrl = page:FindControl("blocklyTip");
+			if(tipCtrl) then
+				tipCtrl.visible = true;
+			end
 		else
 			_guihelper.SetUIColor(page:FindControl("blockMode"), "#808080")
 			_guihelper.SetUIColor(page:FindControl("codeMode"), "#0b9b3a")
+			CodeBlockWindow.SetNplBrowserVisible(false);
+			multiLineCtrl:SetBackgroundColor("#00000000")
+			local tipCtrl = page:FindControl("blocklyTip");
+			if(tipCtrl) then
+				tipCtrl.visible = false;
+			end
 		end
-		local textCtrl = CodeBlockWindow.GetTextControl();
-		if(textCtrl) then
-			textCtrl:SetText(CodeBlockWindow.GetCodeFromEntity());
-		end
+		
+		textCtrl:SetText(CodeBlockWindow.GetCodeFromEntity());
 	end
-    CodeBlockWindow.SetNplBrowserVisible(CodeBlockWindow.IsBlocklyEditMode())
 end
-function CodeBlockWindow.SetNplBrowserVisible(b)
+
+-- @param bForceRefresh: whether to refresh the content of the browser according to current blockly code. If nil, it will refresh if url has changed. 
+function CodeBlockWindow.SetNplBrowserVisible(bVisible, bForceRefresh)
     if(page)then
-        page:CallMethod("nplbrowser_instance","SetVisible",b)
+		-- block NPL.activate "cef3/NplCefPlugin.dll" if npl browser isn't loaded
+        -- so that we can running auto updater normally
+        if(not CodeBlockWindow.NplBrowserIsLoaded())then
+            return
+        end
+		page.isNPLBrowserVisible = bVisible;
+
+		if(bVisible and not CodeBlockWindow.temp_nplbrowser_reload)then
+			-- tricky: this will create the pe:npl_browser control on first use. 
+            CodeBlockWindow.temp_nplbrowser_reload = true;
+            page:Rebuild();
+        end
+
+		page:CallMethod("nplbrowser_instance","SetVisible",bVisible)
+        if(bVisible) then
+			if(bForceRefresh == nil) then
+				if(self.lastBlocklyUrl ~= CodeBlockWindow.GetBlockEditorUrl()) then
+					self.lastBlocklyUrl = CodeBlockWindow.GetBlockEditorUrl();
+					bForceRefresh = true;
+				end
+			end
+			if(bForceRefresh) then
+				page:CallMethod("nplbrowser_instance","Reload",CodeBlockWindow.GetBlockEditorUrl());
+			end
+        end
+        
     end
 end
+
+function CodeBlockWindow.IsNPLBrowserVisible()
+	return page and page.isNPLBrowserVisible;
+end
+
 function CodeBlockWindow.GetBlockEditorUrl()
     local blockpos;
 	local entity = CodeBlockWindow.GetCodeEntity();
@@ -813,31 +848,23 @@ function CodeBlockWindow.OpenBlocklyEditor()
 	if(blockpos) then
 		request_url = request_url..format("?blockpos=%s", blockpos);
 	end
+	NplBrowserLoaderPage.Check(function() 		end);
 
-	local NplCefBrowserManager = CodeBlockWindow.GetChromeBrowserManager();
-	if(NplCefBrowserManager) then
-		 -- Open a new window
-		if(not CodeBlockWindow.isBlocklyOpened) then
-			CodeBlockWindow.isBlocklyOpened = true;
-			NPL.load("(gl)script/apps/Aries/Creator/Game/Mod/DefaultFilters.lua");
-			local DefaultFilters = commonlib.gettable("MyCompany.Aries.Game.DefaultFilters");
-			local url = DefaultFilters.cmd_open_url(request_url)
-
-			local config = NplCefBrowserManager:GetWindowConfig(blocklyWndName);
-			if(false and config and not config.visible) then
-				config.visible = true;
-				config.url = url;
-				NplCefBrowserManager:Show(config);
-			else
-				NplCefBrowserManager:Open({id = blocklyWndName, url = url, showTitleBar=false, withControl = false, x = 0, y = 0, width = math.max(400, Screen:GetWidth()-self.width+205), height = Screen:GetHeight(), });
-			end
-			CodeBlockWindow.UpdateBlocklyWindowSize();
+    if(CodeBlockWindow.NplBrowserIsLoaded() and not Keyboard:IsCtrlKeyPressed())then
+		if(not CodeBlockWindow.IsNPLBrowserVisible()) then
+			NPL.load("(gl)script/apps/Aries/Creator/Game/Network/NPLWebServer.lua");
+			local NPLWebServer = commonlib.gettable("MyCompany.Aries.Game.Network.NPLWebServer");
+			local bStarted, site_url = NPLWebServer.CheckServerStarted(function(bStarted, site_url)
+				if(bStarted) then
+					CodeBlockWindow.SetNplBrowserVisible(true)
+				end
+			end)
 		else
-			CodeBlockWindow.CloseBlocklyWindow();
+			CodeBlockWindow.SetNplBrowserVisible(false)
 		end
 	else
 		GameLogic.RunCommand("/open "..request_url);
-	end
+    end
 end
 
 function CodeBlockWindow.OnOpenBlocklyEditor()
@@ -898,5 +925,7 @@ function CodeBlockWindow:GetSceneContext()
 	end
 	return self.sceneContext;
 end
-
+function CodeBlockWindow.NplBrowserIsLoaded()
+    return NplBrowserLoaderPage.IsLoaded();
+end
 CodeBlockWindow:InitSingleton();

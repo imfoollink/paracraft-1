@@ -15,7 +15,7 @@ local env_imp = commonlib.gettable("MyCompany.Aries.Game.Code.env_imp");
 
 -- create a clone of some code block's actor
 -- @param name: if nil or "myself", it means clone myself
--- @param msg: any mesage that is forwared to clone event
+-- @param msg: any mesage that is forwarded to clone event
 function env_imp:clone(name, msg)
 	self.codeblock:CreateClone(name, msg)
 	env_imp.checkyield(self);
@@ -60,7 +60,7 @@ function env_imp:broadcastAndWait(text, msg)
 	if(msg==nil and self.actor) then
 		msg = self.actor:GetName();
 	end
-	self.codeblock:BroadcastTextEvent(text, msg, self.co:MakeCallbackFunc(function()
+	self.codeblock:BroadcastTextEvent(text, msg, self.co:MakeCallbackFuncAsync(function()
 		isFinished = true;
 		env_imp.resume(self);
 	end));
@@ -75,6 +75,10 @@ end
 
 function env_imp:registerStopEvent(callbackFunc)
 	self.codeblock:RegisterStopEvent(callbackFunc);
+end
+
+function env_imp:registerTickEvent(ticks, callbackFunc)
+	self.codeblock:RegisterTickEvent(ticks, callbackFunc);
 end
 
 function env_imp:registerClickEvent(callbackFunc)
@@ -108,7 +112,10 @@ end
 -- @param cmd: full commands or just command name
 -- @param params: parameters or nil. 
 function env_imp:cmd(cmd, params)
-	self.codeblock:RunCommand(cmd, params)
+	if(params ~= nil and params~="") then
+		cmd = cmd.." "..tostring(params);
+	end
+	self.codeblock:RunCommand(cmd)
 end
 
 

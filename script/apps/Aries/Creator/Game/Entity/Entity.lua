@@ -235,17 +235,38 @@ end
 function Entity:IsBiped()
 end
 
--- whether it will check for collision detection 
+-- whether it will check for collision detection and run FrameMove 
 function Entity:SetDummy(bIsDummy)
 	self.is_dummy = bIsDummy;
 end
 
--- whether it will check for collision detection 
+-- whether it will check for collision detection and run FrameMove 
 function Entity:IsDummy()
 	return self.is_dummy;
 end
 
+-- @param group_id: we can have at most 0-31 groups. if group_id>=32, no one will sense it.
+-- if nil, it will be a group id that cannot be detected. 
+function Entity:SetGroupId(group_id)
+	self.group_id = group_id or 64;
+	local obj = self:GetInnerObject();
+	if(obj) then
+		obj:SetField("GroupID", group_id);
+	end
+end
 
+function Entity:GetGroupId()
+	return self.group_id;
+end
+
+-- @param field: if 0, it will perceive no one. 
+-- @param bEnable: default to true. turn on and off one or more sentient fields
+function Entity:SetSentientField(field, bEnable)
+	local obj = self:GetInnerObject();
+	if(obj) then
+		obj:SetSentientField(field, bEnable ~= nil); 
+	end
+end
 
 function Entity:FaceTarget(x,y,z)
 end
@@ -656,7 +677,10 @@ function Entity:DestroyInnerObject()
 			EntityManager.SetEntityByObjectID(self.obj_id, nil)
 		end
 		self.obj = nil;
-		self.obj_id = nil;
+		if(self.obj_id) then
+			EntityManager.SetEntityByObjectID(self.obj_id, nil);
+			self.obj_id = nil;
+		end
 	end
 end
 
@@ -916,6 +940,7 @@ function Entity:GetInnerObject()
 			return obj;
 		else
 			self.obj = nil;
+			EntityManager.SetEntityByObjectID(self.obj_id, nil);
 			self.obj_id = nil;
 		end
 	end
@@ -952,6 +977,10 @@ function Entity:GetItemClass()
 	end
 end		
 
+-- whether it can be searched via Ctrl+F FindBlockTask
+function Entity:IsSearchable()
+end
+
 -- get the associated block template class. 
 function Entity:GetBlock()
 	if(self.block) then
@@ -979,6 +1008,8 @@ function Entity:Destroy()
 	self:Detach();
 	if(self.pool_manager) then
 		self.pool_manager:RecollectEntity(self);
+	else
+		Entity._super.Destroy(self);
 	end
 end
 
@@ -1104,6 +1135,10 @@ end
 
 function Entity:IsServerEntity()
 	return self.isServerEntity;
+end
+
+function Entity:SetServerEntity(isServerEntity)
+	self.isServerEntity = isServerEntity~=false;
 end
 
 -- virtual function: right click to edit. 
@@ -1294,8 +1329,7 @@ function Entity:GetPosition()
 	if(self.x) then
 		return self.x, self.y, self.z;
 	elseif(self.bx) then
-		local x,y,z = BlockEngine:real(self.bx, self.by, self.bz);
-		y = y - BlockEngine.half_blocksize;
+		local x,y,z = BlockEngine:real_bottom(self.bx, self.by, self.bz);
 		return x,y,z;
 	else
 		return 0,0,0;
@@ -1808,7 +1842,7 @@ end
 -- true to run the framemove and increase the local time. 
 -- @return nil or deltaTimeReal in seconds.
 function Entity:CheckFrameMove(deltaTime, curTime, bForceFrameMove)
-	if(self.framemove_interval and (bForceFrameMove or self:IsTick("FrameMove", deltaTime, self.framemove_interval))) then
+	if(not self:IsDummy() and self.framemove_interval and (bForceFrameMove or self:IsTick("FrameMove", deltaTime, self.framemove_interval))) then
 		local deltaTimeReal;
 		if(self.last_frametime) then
 			deltaTimeReal = curTime - (self.last_frametime or curTime);
@@ -2737,5 +2771,21 @@ function Entity:GetSelectionEffect()
 		return obj:GetField("SelectionEffect", 1);
 	else
 		return 1
+	end
+end
+
+function Entity:SetShaderCaster(enabled)
+	local obj = self:GetInnerObject();
+	if(obj) then
+		obj:SetField("ShadowCaster", enabled==true);
+	end
+end
+
+function Entity:IsShaderCaster()
+	local obj = self:GetInnerObject();
+	if(obj) then
+		return obj:GetField("ShadowCaster", true);
+	else
+		return true;
 	end
 end

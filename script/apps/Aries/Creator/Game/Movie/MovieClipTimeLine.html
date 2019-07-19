@@ -47,17 +47,17 @@ end
         <div style="background:url(Texture/whitedot.png);background-color:#000000cc">
                 <!-- 左侧 开始时间 -->
                 <div style='<%=format("position: relative; background: url(Texture/whitedot.png); background-color: #9af6aa; margin-left: 0px; margin-top: 0px; height: %dpx; width: 64px", MovieClipTimeLine.timelineHeight)%>'>
-                    <input type="text" name="starttime" enable_ime="false" spacing="0" style='<%=format("background:;font-size:20px;font-weight:bold;margin-left:0px;margin-top:0px;height:%dpx;width:64px", MovieClipTimeLine.timelineHeight+4)%>' value="0" onchange="MovieClipTimeLine.OnChangeStartTime" />
+                    <input type="text" name="starttime" tooltip='<%=L"开始时间(秒)"%>' enable_ime="false" spacing="0" style='<%=format("background:;font-size:20px;font-weight:bold;margin-left:0px;margin-top:0px;height:%dpx;width:64px", MovieClipTimeLine.timelineHeight+4)%>' value="0" onchange="MovieClipTimeLine.OnChangeStartTime" />
                 </div>
                 <!-- 右侧 结束时间 -->
                 <div align="right" style='<%=format("position: relative; background: url(Texture/whitedot.png); background-color: #9af6aa; margin-left: 0px; margin-top: 0px; height: %dpx; width: 64px", MovieClipTimeLine.timelineHeight)%>'>
-                    <input type="text" name="endtime" enable_ime="false" spacing="0" style='<%=format("background:;font-size:20px;font-weight:bold;margin-left:0px;margin-top:0px;height:%dpx;width:64px", MovieClipTimeLine.timelineHeight+4)%>' value='10' onchange="MovieClipTimeLine.OnChangeEndTime" />
+                    <input type="text" name="endtime" tooltip='<%=L"结束时间(秒)"%>' enable_ime="false" spacing="0" style='<%=format("background:;font-size:20px;font-weight:bold;margin-left:0px;margin-top:0px;height:%dpx;width:64px", MovieClipTimeLine.timelineHeight+4)%>' value='10' onchange="MovieClipTimeLine.OnChangeEndTime" />
                 </div>
                 <pe:custom name="keyframes" width="100%" oncreate="OnCreateKeyFrameCtrl" style='<%=format("margin-left:64px;margin-right:64px;height:%dpx;", MovieClipTimeLine.timelineHeight)%>'></pe:custom>
             </div>
             <div>
                 <pe:sliderbar name="timeline" show_step_button="true" step_left_button_bg="Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png;299 401 10 11:2 2 2 2" step_right_button_bg="Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png;337 401 10 11:2 2 2 2"
-                              onchange="MovieClipTimeLine.OnTimeChanged()" min="0" max="30000" min_step="1" value="0" style='<%=format("background:;height:%dpx;", MovieClipTimeLine.timeSliderHeight)%>' button_bg="Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png;310 401 26 11:3 3 3 3"
+                              onchange="MovieClipTimeLine.OnTimeChanged()" onclick="MovieClipTimeLine.OnClickTimeButton()" min="0" max="30000" min_step="1" value="0" style='<%=format("background:;height:%dpx;", MovieClipTimeLine.timeSliderHeight)%>' button_bg="Texture/Aries/Creator/Theme/GameCommonIcon_32bits.png;310 401 26 11:3 3 3 3"
                               buttontext_color="#cccccc" buttontext_format="%d / %d" button_width="128" button_height='<%=MovieClipTimeLine.timeSliderHeight%>' EditorWidth="90" EditorFormat="%d" IsShowEditor="false" direction="horizontal" />
             </div>
         </div>

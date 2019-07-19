@@ -77,8 +77,15 @@ function CodeHelpWindow.InitCmds()
 		NPL.load("(gl)script/apps/Aries/Creator/Game/Code/LanguageConfigurations.lua");
 		local LanguageConfigurations = commonlib.gettable("MyCompany.Aries.Game.Code.LanguageConfigurations");
 
+		
 		local langConfig = LanguageConfigurations:LoadConfigByFilename(filename)
 		if(langConfig) then
+			if(CodeHelpWindow.lastLangConfig and CodeHelpWindow.lastLangConfig~=langConfig) then
+				if(CodeHelpWindow.lastLangConfig.OnDeselect) then
+					CodeHelpWindow.lastLangConfig.OnDeselect();
+				end
+			end
+
 			if (langConfig.GetCategoryButtons) then
 				CodeHelpWindow.SetCategories(langConfig.GetCategoryButtons())
 			end
@@ -87,6 +94,11 @@ function CodeHelpWindow.InitCmds()
 			end
 			if (langConfig.GetCodeExamples) then
 				CodeHelpWindow.AddCodeExamples(langConfig.GetCodeExamples());
+			end
+			
+			CodeHelpWindow.lastLangConfig = langConfig;
+			if(langConfig.OnSelect) then
+				langConfig.OnSelect();
 			end
 		end
 	end
@@ -293,10 +305,12 @@ function CodeHelpWindow.GenerateWikiDocs(bSilent)
 							local html = item:GetHtml() or ""
 							html = html:gsub("<div [^>]*>", "`"):gsub("</div>", "`")
 							html = html:gsub("<input .*value=\"([^\"]+)\"[^/]*/>", "`%1`")
-							docs[#docs+1] = "> "..html..": "..code;
+							docs[#docs+1] = '<div style="float:left;margin-right:10px;">\n\n'
+							docs[#docs+1] = "> "..html.."\n"..code;
 							if(not code:match("\n%s*$")) then
 								docs[#docs+1] = "\n"
 							end
+							docs[#docs+1] = '\n</div>\n<div style="float:left;">\n\n'
 							docs[#docs+1] = "```lua\n"
 							local examples = item:GetNPLCodeExamples();
 							docs[#docs+1] = examples;
@@ -304,6 +318,7 @@ function CodeHelpWindow.GenerateWikiDocs(bSilent)
 								docs[#docs+1] = "\n"
 							end
 							docs[#docs+1] = "```\n"
+							docs[#docs+1] = '\n</div>\n<div style="clear:both"/>\n\n'
 						end
 					end
 				end

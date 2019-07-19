@@ -2,7 +2,7 @@
 Title: Sign
 Author(s): LiXizhi
 Date: 2013/12/17
-Desc:
+Desc: 
 use the lib:
 ------------------------------------------------------------
 NPL.load("(gl)script/apps/Aries/Creator/Game/Entity/EntitySign.lua");
@@ -45,7 +45,7 @@ end
 
 function Entity:OnBlockLoaded(x,y,z, data)
 	self.block_data = data or self.block_data or 0;
-	-- backward compatibility, since we used to store facing instead of data in very early version.
+	-- backward compatibility, since we used to store facing instead of data in very early version. 
 	-- this should never happen in versions after late 2014
 	if(self.block_data == 0 and (self.facing or 0) ~= 0) then
 		LOG.std(nil, "warn", "info", "fix BlockSign entity facing and block data incompatibility in early version: %d %d %d", self.bx, self.by, self.bz);
@@ -58,20 +58,24 @@ function Entity:UpdateBlockDataByFacing()
 	local x,y,z = self:GetBlockPos();
 	local dir_id = Direction.GetDirectionFromFacing(self.facing or 0);
 	self.block_data = dir_id;
-	BlockEngine:SetBlockData(x,y,z, dir_id);
+	BlockEngine:SetBlockData(x,y,z, dir_id);	
+end
+
+function Entity:GetDisplayName()
+	return self.cmd or "";
 end
 
 function Entity:Refresh()
 	local hasText = self.cmd and self.cmd~=""
-	if(hasText) then
+	if(hasText and not self.wasDeleted) then
 		-- only create C++ object when cmd is not empty
 		if(not self.obj) then
-			-- Node: we do not draw the model, it is only used for drawing UI overlay.
+			-- Node: we do not draw the model, it is only used for drawing UI overlay. 
 			obj = self:CreateInnerObject("model/blockworld/TextFrame/TextFrame.x", nil, BlockEngine.half_blocksize, BlockEngine.blocksize);
 			if(obj) then
-				-- making it using custom renderer since we are using chunk buffer to render.
+				-- making it using custom renderer since we are using chunk buffer to render. 
 				obj:SetAttribute(0x20000, true);
-			end
+			end	
 		end
 	end
 	local obj = self:GetInnerObject();
@@ -101,7 +105,13 @@ function Entity:GetDescriptionPacket()
 	return Packets.PacketUpdateEntitySign:new():Init(x,y,z, self.cmd, self.block_data);
 end
 
--- update from packet.
+
+-- whether it can be searched via Ctrl+F FindBlockTask
+function Entity:IsSearchable()
+	return true;
+end
+
+-- update from packet. 
 function Entity:OnUpdateFromPacket(packet_UpdateEntitySign)
 	if(packet_UpdateEntitySign:isa(Packets.PacketUpdateEntitySign)) then
 		self:SetCommand(packet_UpdateEntitySign.text);

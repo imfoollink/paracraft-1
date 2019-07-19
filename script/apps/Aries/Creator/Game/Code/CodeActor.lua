@@ -629,17 +629,24 @@ function Actor:SetMovieActorImp(itemStack, movie_entity)
 		local x, y, z = entity:GetPosition()
 		local facing = entity:GetFacing()
 		local wasVisible = entity:IsVisible()
+		local variables = entity:GetVariables();
+		local hasFocus = entity:HasFocus();
 		self:DestroyEntity();
 		self:Init(itemStack, movie_entity);
 		self:FrameMove(self:GetTime() or 0, false);
 		entity = self:GetEntity();
 		if(entity) then
+			if(hasFocus) then
+				entity:SetFocus();
+			end
 			entity:SetPosition(x,y,z);
 			entity:SetFacing(facing);
 			if(not wasVisible) then
 				entity:SetVisible(wasVisible);
 			end
+			variables:copyTo(entity:GetVariables());
 		end
+		self:EnableActorPicking(self:IsActorPickingEnabled());
 	end
 end
 
@@ -799,6 +806,22 @@ function Actor:GetSelectionEffect()
 	return entity and entity:GetSelectionEffect()
 end
 
+
+function Actor:SetShaderCaster(enabled)
+	local entity = self:GetEntity();
+	if entity then
+		if(type(enabled) == "string") then
+			enabled = enabled == "true"
+		end
+		entity:SetShaderCaster(enabled)
+	end
+end
+
+function Actor:IsShaderCaster()
+	local entity = self:GetEntity();
+	return entity and entity:SetShaderCaster()
+end
+
 local internalValues = {
 	["name"] = {setter = Actor.SetName, getter = Actor.GetName, isVariable = true}, 
 	["time"] = {setter = Actor.SetTime, getter = Actor.GetTime, isVariable = true}, 
@@ -822,8 +845,10 @@ local internalValues = {
 	["movieactor"] = {setter = Actor.SetMovieActor, isVariable = false}, 
 	["walkSpeed"] = {setter = Actor.SetWalkSpeed, getter = Actor.GetWalkSpeed, isVariable = false}, 
 	["billboarded"] = {setter = Actor.SetBillboarded, getter = Actor.IsBillboarded, isVariable = false},
+	["shadowCaster"] = {setter = Actor.SetShaderCaster, getter = Actor.IsShaderCaster, isVariable = false},
 	["initParams"] = {getter = Actor.GetInitParams, isVariable = false},
 }
+
 
 function Actor:GetActorValue(name)
 	local entity = self:GetEntity()

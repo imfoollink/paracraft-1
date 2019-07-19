@@ -60,6 +60,7 @@ local var_name_to_text = {
 	opacity = L"透明度",
 	pos = L"位置",
 	screen_pos = L"屏幕坐标",
+	ui_zorder = L"Z排序",
 	ui_align = L"屏幕坐标对齐方式",
 	parent = L"父链接",
 	color = L"颜色",
@@ -98,6 +99,7 @@ function MovieClipTimeLine.OnClosePage()
 	Game.SelectionManager:Disconnect("selectedActorChanged", self, self.OnSelectedActorChange);
 	Game.SelectionManager:Disconnect("varNameChanged", self, self.OnVariableNameChange);
 	MovieManager:Disconnect("activeMovieClipChanged", self, self.OnActiveMovieClipChange);
+
 	self.inited = false;
 	local viewport = ViewportManager:GetSceneViewport();
 	if(viewport:GetMarginBottomHandler() == self) then
@@ -123,9 +125,11 @@ function MovieClipTimeLine:OnActiveMovieClipChange(clip)
 	if(self.activeClip~=clip) then
 		if(self.activeClip) then
 			self.activeClip:Disconnect("timeChanged", self, self.OnMovieClipTimeChange);
+			self.activeClip:Disconnect("remotelyUpdated", self, self.OnMovieClipRemotelyUpdated);
 		end
 		if(clip) then
-			clip:Connect("timeChanged", self, self.OnMovieClipTimeChange);
+			clip:Connect("timeChanged", self, self.OnMovieClipTimeChange, "UniqueConnection");
+			clip:Connect("remotelyUpdated", self, self.OnMovieClipRemotelyUpdated, "UniqueConnection");
 		end
 		self.activeClip = clip;
 	end
@@ -138,6 +142,12 @@ function MovieClipTimeLine:UpdateUI()
 		self:UpdateSubKeyFrames(time, true);
 		self:UpdateKeyFrames(time, true);
 		self:UpdateTimeSlider(time);
+	end
+end
+
+function MovieClipTimeLine:OnMovieClipRemotelyUpdated()
+	if(page and page:IsVisible()) then
+		self:UpdateUI()
 	end
 end
 
@@ -446,13 +456,21 @@ function MovieClipTimeLine:GetVariableList()
 			local cmdActor = self:GetCmdActor(true);
 			if(cmdActor) then
 				for index, name in ipairs(cmdActor:GetEditableVariableList()) do
-					varList[#varList+1] = {name=name, index=index, actor=cmdActor, originalActor = actor, originalIndex = -1};
+					if(name == "---") then
+						varList[#varList+1] = {type="seperator"};
+					else
+						varList[#varList+1] = {name=name, index=index, actor=cmdActor, originalActor = actor, originalIndex = -1};
+					end
 				end
 				varList[#varList+1] = {type="seperator"};
 			end
 		end
 		for index, name in ipairs(actor:GetEditableVariableList()) do
-			varList[#varList+1] = {name=name, index=index, actor=actor};
+			if(name == "---") then
+				varList[#varList+1] = {type="seperator"};
+			else
+				varList[#varList+1] = {name=name, index=index, actor=actor};
+			end
 		end
 	end
 	return varList
@@ -852,5 +870,23 @@ function MovieClipTimeLine.OnChangeEndTime()
 				end
 			end
 		end
+	end
+end
+
+function MovieClipTimeLine.OnClickTimeButton(value)
+	if(mouse_button == "right") then
+		NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/EnterTextDialog.lua");
+		local EnterTextDialog = commonlib.gettable("MyCompany.Aries.Game.GUI.EnterTextDialog");
+		EnterTextDialog.ShowPage(L"设置当前时间（毫秒）", function(result)
+			if(result and result~="") then
+				local newTime = result:match("^(%d+)");
+				if(newTime) then
+					if(page) then
+						page:SetValue("timeline", newTime)
+						MovieClipTimeLine.OnTimeChanged(page:GetValue("timeline", 0))
+					end
+				end
+			end
+		end,tostring(value));
 	end
 end

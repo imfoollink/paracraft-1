@@ -57,6 +57,7 @@ Entity:Property({"ui_y", 0, "GetScreenY", "SetScreenY", auto=true});
 Entity:Property({"ui_align", "center", "GetAlignment", "SetAlignment", auto=true});
 Entity:Property({"screen_half_width", 500, "GetScreenHalfWidth", "SetScreenHalfWidth", auto=true});
 Entity:Property({"roll", 0, "GetRoll", "SetRoll", auto=true});
+Entity:Property({"zorder", nil, "GetZOrder", "SetZOrder"});
 Entity:Property({"color", "#ffffff", "GetColor", "SetColor", auto=true});
 Entity:Property({"isPickingEnabled", false, "IsPickingEnabled", "SetSkipPicking"});
 
@@ -150,6 +151,21 @@ function Entity:DestroyOverlay()
 		self.overlay = nil;
 	end
 end
+
+-- zorder 
+function Entity:SetZOrder(zorder)
+	if(self.overlay) then
+		self.overlay:SetZOrder(zorder)
+	end
+end
+
+function Entity:GetZOrder()
+	if(self.overlay) then
+		return self.overlay:GetZOrder()
+	end
+	return 0;
+end
+
 
 function Entity:CreateOverlay(parent)
 	self:DestroyOverlay();
@@ -396,7 +412,8 @@ function Entity:CreateGetRootScreenOverlay()
 	return Entity.rootScreenOverlay;
 end
 
-function Entity:WorldUnloaded()
+-- singleton callback
+function Entity.WorldUnloaded()
 	Entity:EnableScreenTimer(false);
 	if(Entity.rootScreenOverlay) then
 		Entity.rootScreenOverlay:Destroy()
@@ -409,7 +426,7 @@ function Entity:EnableScreenTimer(bEnable)
 	if(bEnable) then
 		if(not Entity.rootScreenOverlayTick) then
 			Entity.rootScreenOverlayTick = Overlay:new():init();
-			GameLogic:Connect("WorldUnloaded", Entity, Entity.WorldUnloaded, "UniqueConnection")
+			GameLogic:Connect("WorldUnloaded", Entity.WorldUnloaded, nil, "UniqueConnection")
 			Entity.rootScreenOverlayTick.EnableZPass = true;
 			Entity.rootScreenOverlayTick:SetUseCameraPos(true);
 			Entity.rootScreenOverlayTick.paintZPassEvent = function(self, painter)

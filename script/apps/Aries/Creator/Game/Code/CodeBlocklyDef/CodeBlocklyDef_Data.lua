@@ -49,8 +49,8 @@ say(key, 1)
 		{
 			name = "value",
 			type = "input_value",
-			shadow = { type = "text", value = "value",},
-			text = "value",
+			shadow = { type = "functionParams", value = "0",},
+			text = "0",
 		},
 	},
 	category = "Data", 
@@ -60,7 +60,7 @@ say(key, 1)
 	nextStatement = true,
 	func_description = 'local %s = %s',
 	ToNPL = function(self)
-		return 'local key = "value"\n';
+		return string.format('%s = %s\n', self:getFieldAsString('var'), self:getFieldAsString('value'));
 	end,
 	examples = {{desc = "", canRun = true, code = [[
 local key = "value"
@@ -81,7 +81,7 @@ say(key, 1)
 		{
 			name = "right",
 			type = "input_value",
-			shadow = { type = "text", value = "1",},
+			shadow = { type = "functionParams", value = "1",},
 			text = "1",
 		},
 	},
@@ -112,7 +112,7 @@ say(text, 1)
 		{
 			name = "value",
 			type = "input_value",
-            shadow = { type = "text", value = "1",},
+            shadow = { type = "functionParams", value = "1",},
 			text = "1", 
 		},
 	},
@@ -123,7 +123,7 @@ say(text, 1)
 	nextStatement = true,
 	func_description = 'set(%s, %s)',
 	ToNPL = function(self)
-		return string.format('set("%s", "%s")\n', self:getFieldAsString('key'), self:getFieldAsString('value'));
+		return string.format('set("%s", %s)\n', self:getFieldAsString('key'), self:getFieldAsString('value'));
 	end,
 	examples = {{desc = L"也可以用_G.a", canRun = true, code = [[
 _G.a = _G.a or 1
@@ -209,8 +209,8 @@ clone("myself", 3)
 		{
 			name = "input",
 			type = "input_value",
-			shadow = { type = "actorNames", value = "myself",},
-			text = "myself",
+			shadow = { type = "text", value = "myself",},
+			text = "\"myself\"",
 		},
 		{
 			name = "params",
@@ -224,9 +224,9 @@ clone("myself", 3)
 	canRun = false,
 	previousStatement = true,
 	nextStatement = true,
-	func_description = 'clone("%s", %s)',
+	func_description = 'clone(%s, %s)',
 	ToNPL = function(self)
-		return string.format('clone("%s")\n', self:getFieldAsString('input'));
+		return string.format('clone(%s)\n', self:getFieldAsString('input'));
 	end,
 	examples = {{desc = "", canRun = true, code = [[
 registerClickEvent(function()
@@ -296,9 +296,11 @@ end
 				{ L"是否为化身", "isAgent" },
 				{ L"模型文件", "assetfile" },
 				{ L"绘图代码", "rendercode" },
+				{ L"Z排序", "zorder" },
 				{ L"电影方块的位置", "movieblockpos" },
 				{ L"电影角色", "movieactor" },
 				{ L"广告牌效果", "billboarded" },
+				{ L"是否投影", "shadowCaster" },
 				{ L"初始化参数", "initParams" },
 			},
 		},
@@ -330,8 +332,8 @@ end
 		{
 			name = "value",
 			type = "input_value",
-            shadow = { type = "text", value = "actor1",},
-			text = "actor1", 
+            shadow = { type = "text", value = "",},
+			text = "", 
 		},
 	},
 	category = "Data", 
@@ -593,7 +595,7 @@ log(t)
 		{
 			name = "param",
 			type = "field_input",
-			text = "param", 
+			text = "", 
 		},
 	},
     arg1 = {
@@ -626,7 +628,7 @@ thinkText("Let me think");
 		{
 			name = "value",
 			type = "field_input",
-			text = "params"
+			text = ""
 		},
 	},
 	hide_in_toolbox = true,
@@ -656,7 +658,7 @@ thinkText("Let me think");
 			name = "param",
 			type = "input_value",
 			shadow = { type = "functionParams", value = "param",},
-			text = "param",
+			text = "",
 		},
 	},
 	previousStatement = true,
@@ -689,7 +691,7 @@ thinkText("Let me think");
 			name = "param",
 			type = "input_value",
 			shadow = { type = "functionParams", value = "param",},
-			text = "param",
+			text = "",
 		},
 	},
 	output = {type = "null",},
@@ -951,7 +953,7 @@ a:print()
 		{
 			name = "value",
 			type = "input_value",
-            shadow = { type = "text", value = "value",},
+            shadow = { type = "functionParams", value = "",},
 			text = "value", 
 		},
 	},
@@ -985,7 +987,7 @@ assert(score == 1)
 		{
 			name = "defaultvalue",
 			type = "input_value",
-            shadow = { type = "text", value = "",},
+            shadow = { type = "functionParams", value = "",},
 			text = "", 
 		},
 	},
@@ -1019,7 +1021,7 @@ assert(score == 1)
 		{
 			name = "value",
 			type = "input_value",
-            shadow = { type = "text", value = "value",},
+            shadow = { type = "functionParams", value = "",},
 			text = "value", 
 		},
 	},
@@ -1060,7 +1062,7 @@ assert(monsterCount == 1)
 		{
 			name = "defaultvalue",
 			type = "input_value",
-            shadow = { type = "text", value = "",},
+            shadow = { type = "functionParams", value = "",},
 			text = "", 
 		},
 	},

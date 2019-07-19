@@ -367,6 +367,7 @@ if(answer == 1) then
 elseif(answer == 2) then
     say("you choose B")
 end
+
 ]]},
 {desc = "", canRun = true, code = [[
 local name = ask("what is your name?")
@@ -407,7 +408,6 @@ else
 end
 ]]}},
 },
-
 {
 	type = "isKeyPressed", 
 	message0 = L"%1键是否按下",
@@ -489,6 +489,25 @@ while(true) do
         wait(0.3)
     end
 end
+]]}},
+},
+
+{
+	type = "getMousePoint", 
+	message0 = L"鼠标XY",
+	arg0 = {
+	},
+	output = {type = "field_number",},
+	category = "Sensing", 
+	helpUrl = "", 
+	canRun = false,
+	func_description = 'getMousePoint()',
+	ToNPL = function(self)
+		return string.format('local x, y = getMousePoint()\n');
+	end,
+	examples = {{desc = "", canRun = true, code = [[
+-- x in [-500, 500]
+local x, y = getMousePoint()
 ]]}},
 },
 
@@ -631,6 +650,9 @@ wait(1)
 -- 0 to delete block
 setBlock(x,y+2,z, 0)
 setBlock(x,y+2,z, id)
+-- with additional block data
+local data = 0
+setBlock(x,y+2,z, id, data)
 ]]}},
 },
 

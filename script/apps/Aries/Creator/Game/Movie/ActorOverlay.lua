@@ -46,6 +46,7 @@ Actor:Property({"Font", "System;14;norm", auto=true})
 Actor:Property({"text", nil, "GetText", "SetText", auto=true})
 -- line height in pixels
 Actor:Property({"lineheight", 16,})
+Actor:Property({"enablePicking", true, "IsPickingEnabled", "EnablePicking", auto=true})
 
 Actor:Property({"bounding_radius", 0, "GetBoundingRadius", "SetBoundingRadius", auto=true})
 Actor:Property({"m_aabb", nil,})
@@ -56,12 +57,16 @@ Actor.class_name = "ActorOverlay";
 local selectable_var_list = {
 	"text",
 	"code",
+	"---", -- separator
 	"pos", -- multiple of x,y,z
- 	"screen_pos", -- multiple of ui_x, ui_y, ui_align
-	"ui_align", -- "center", "top", "bottom"
 	"facing", 
 	"rot", -- multiple of "roll", "pitch", "facing"
 	"scaling", 
+	"---", -- separator
+ 	"screen_pos", -- multiple of ui_x, ui_y
+	"ui_align", -- "center", "top", "bottom"
+	"ui_zorder", -- 2d ui zorder
+	"---", -- separator
 	"opacity",
 	"color",
 };
@@ -162,6 +167,7 @@ function Actor:Init(itemStack, movieclipEntity)
 	timeseries:CreateVariableIfNotExist("z", "Linear");
 	timeseries:CreateVariableIfNotExist("ui_x", "Linear");
 	timeseries:CreateVariableIfNotExist("ui_y", "Linear");
+	timeseries:CreateVariableIfNotExist("ui_zorder", "Linear");
 	timeseries:CreateVariableIfNotExist("ui_align", "Discrete");
 	timeseries:CreateVariableIfNotExist("facing", "LinearAngle");
 	timeseries:CreateVariableIfNotExist("pitch", "LinearAngle");
@@ -399,6 +405,28 @@ color("#ff0000"); font(14);<br/>
 				end
 			end
 		end, old_value)
+	elseif(keyname == "ui_zorder") then
+		local title = format(L"起始时间%s, 请输入UI Z排序", strTime);
+		title = title.."<br/>0-1000";
+		old_value = self:GetValue("ui_zorder", curTime) or 0;
+
+		NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/EnterTextDialog.lua");
+		local EnterTextDialog = commonlib.gettable("MyCompany.Aries.Game.GUI.EnterTextDialog");
+		EnterTextDialog.ShowPage(title, function(result)
+			if(result) then
+				local zorder = result:match("%-?%d+");
+				if(zorder) then
+					zorder = tonumber(zorder);
+					self:BeginUpdate();
+					self:AddKeyFrameByName("ui_zorder", nil, zorder);
+					self:EndUpdate();
+					self:FrameMovePlaying(0);
+					if(callbackFunc) then
+						callbackFunc(true);
+					end
+				end
+			end
+		end, old_value)
 	elseif(keyname == "screen_pos") then
 		local title = format(L"起始时间%s, 请输入位置x,y", strTime);
 		title = title.."<br/>x=[-500,500],y=[-500,500]";
@@ -534,6 +562,11 @@ function Actor:FrameMovePlaying(deltaTime)
 
 		entity:SetScreenPos(ui_x or 0, ui_y or 0);
 		entity:SetScreenMode(true);
+
+		local ui_zorder = self:GetValue("ui_zorder", curTime);
+		if(ui_zorder) then
+			entity:SetZOrder(ui_zorder);
+		end
 	else
 		entity:SetScreenMode(false);
 
@@ -737,6 +770,10 @@ end
 
 function Actor:DoRender(painter)
 	local isPickingPass = self.entity.overlay:IsPickingPass();
+
+	if(not self:IsPickingEnabled() and isPickingPass) then
+		return
+	end
 
 
 	local env = self:CheckInstallCodeEnv(painter, isPickingPass);

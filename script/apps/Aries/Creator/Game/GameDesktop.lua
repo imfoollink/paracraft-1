@@ -20,7 +20,6 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/GoalTracker.lua");
 NPL.load("(gl)script/apps/Aries/Creator/ToolTipsPage.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/DesktopMenuPage.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Mod/ModManager.lua");
-NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/TouchController.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Areas/QuickSelectBar.lua");
 NPL.load("(gl)script/apps/Aries/Creator/Game/SceneContext/AllContext.lua");
 
@@ -35,7 +34,6 @@ local GoalTracker = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.Goa
 local CameraController = commonlib.gettable("MyCompany.Aries.Game.CameraController")
 local DesktopMenuPage = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.DesktopMenuPage");
 local ModManager = commonlib.gettable("Mod.ModManager");
-local TouchController = commonlib.gettable("MyCompany.Aries.Game.GUI.TouchController");
 local QuickSelectBar = commonlib.gettable("MyCompany.Aries.Creator.Game.Desktop.QuickSelectBar");
 local AllContext = commonlib.gettable("MyCompany.Aries.Game.AllContext");
 	
@@ -358,12 +356,28 @@ function Desktop.OnExit(bForceExit, bRestart)
 		return
 	end
 	if(GameLogic.IsReadOnly()) then
-		if(not bForceExit and System.options.IsMobilePlatform) then
-			_guihelper.MessageBox(L"确定要退出当前世界么？", function()
-				Desktop.ForceExit(bRestart);
-			end);
+		if(bForceExit or Desktop.is_exiting) then
+			-- double click to exit without saving. 
+			Desktop.ForceExit();
 		else
-			Desktop.ForceExit(bRestart);
+			Desktop.is_exiting = true;
+
+			local dialog = {
+				text = L"确定要退出当前世界么？", 
+				callback = function(res)
+					Desktop.is_exiting = false;
+					if(res and res == _guihelper.DialogResult.Yes) then
+						Desktop.ForceExit(bRestart);
+					elseif(res and res == _guihelper.DialogResult.No) then
+						Desktop.ForceExit(bRestart);
+					end
+				end
+			};
+			local dialog = GameLogic.GetFilters():apply_filters("ShowExitDialog", dialog);
+			if(dialog and dialog.callback and dialog.text) then
+				_guihelper.MessageBox(dialog.text, 
+					dialog.callback, _guihelper.MessageBoxButtons.YesNoCancel);
+			end
 		end
 	else
 		if(bForceExit or Desktop.is_exiting) then
@@ -428,9 +442,9 @@ function Desktop.GetChatGUI()
 	return Desktop.GUI.chat;
 end
 
+-- obsoleted: now mobile and desktop are the same.
 function Desktop.ShowMobileDesktop(bShow)
 	QuickSelectBar.ShowPage(bShow);
-	TouchController.ShowPage(bShow);
 	NPL.load("(gl)script/mobile/paracraft/Areas/SystemMenuPage.lua");
 	local SystemMenuPage = commonlib.gettable("ParaCraft.Mobile.Desktop.SystemMenuPage");
 	SystemMenuPage.ShowPage(bShow);

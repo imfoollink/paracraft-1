@@ -47,12 +47,21 @@ local animate_by_script = true;
 
 -- keyframes that can be edited from UI keyframe. 
 local selectable_var_list = {
-	"anim", "bones", "assetfile", "skin", "blockinhand",
+	"anim", "bones", 
 	"pos", -- multiple of x,y,z
 	"facing", 
 	"rot", -- multiple of "roll", "pitch", "facing"
+	"scaling",
 	"head", -- multiple of "HeadUpdownAngle", "HeadTurningAngle"
-	"scaling", "speedscale", "gravity", "opacity", "blocks", "parent", 
+	"---", -- separator
+	"speedscale", 
+	"gravity", 
+	"---", -- separator
+	"assetfile", "skin", "opacity", 
+	"blockinhand",
+	"blocks",
+	"---", -- separator
+	"parent", 
 	"static", -- multiple of "name" and "isAgent"
 };
 
@@ -313,6 +322,10 @@ function Actor:Init(itemStack, movieclipEntity, isReuseActor, newName, movieclip
 			self.entity:SetActor(self);
 			self.entity:SetPersistent(false);
 			self.entity:SetDummy(true);
+			self.entity:SetGroupId(nil);
+			self.entity:SetSentientField(0);
+			self.entity:SetServerEntity(false);
+
 			if(skin) then
 				self.entity:SetSkin(skin);
 			end
@@ -1384,6 +1397,9 @@ function Actor:SetBoneTime(boneName, time)
 end
 
 function Actor:DestroyEntity()
+	if(self:IsAgent() and self.entity) then
+		self:ReleaseEntityControl();
+	end
 	Actor._super.DestroyEntity(self)
 	if(self.bones_variable) then
 		self:Disconnect("dataSourceChanged", self.bones_variable, self.bones_variable.LoadFromActor)
@@ -1412,9 +1428,3 @@ function Actor:ReleaseEntityControl()
 	self:UnbindAnimInstance();
 end
 
-function Actor:DestroyEntity()
-	if(self:IsAgent() and self.entity) then
-		self:ReleaseEntityControl();
-	end
-	Actor._super.DestroyEntity(self);
-end

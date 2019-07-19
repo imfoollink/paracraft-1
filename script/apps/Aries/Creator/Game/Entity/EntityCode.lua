@@ -23,12 +23,14 @@ local GameLogic = commonlib.gettable("MyCompany.Aries.Game.GameLogic")
 local EntityManager = commonlib.gettable("MyCompany.Aries.Game.EntityManager");
 local ItemStack = commonlib.gettable("MyCompany.Aries.Game.Items.ItemStack");
 local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
+local Packets = commonlib.gettable("MyCompany.Aries.Game.Network.Packets");
 
 local Entity = commonlib.inherit(commonlib.gettable("MyCompany.Aries.Game.EntityManager.EntityBlockBase"), commonlib.gettable("MyCompany.Aries.Game.EntityManager.EntityCode"));
 
 Entity:Property({"languageConfigFile", "", "GetLanguageConfigFile", "SetLanguageConfigFile"})
 Entity:Signal("beforeRemoved")
 Entity:Signal("editModeChanged")
+Entity:Signal("remotelyUpdated")
 Entity:Signal("inventoryChanged", function(slotIndex) end)
 
 -- class name
@@ -242,7 +244,7 @@ end
 
 -- Ticks the block if it's been scheduled
 function Entity:updateTick(x,y,z)
-	local isPowered = BlockEngine:GetBlockData(x,y,z) > 0;
+	local isPowered = mathlib.bit.band(BlockEngine:GetBlockData(x,y,z), 0xff) > 0;
 	self:SetPowered(isPowered);	
 end
 
@@ -262,7 +264,9 @@ function Entity:SetPowered(isPowered)
 		self.isPowered = isPowered;
 		local codeBlock = self:GetCodeBlock(true)
 		if(codeBlock and not codeBlock:IsLoaded()) then
-			self:Restart();
+			if(not GameLogic.isRemote) then
+				self:Restart();
+			end
 		end
 	end
 end
@@ -271,7 +275,9 @@ function Entity:Refresh()
 	local codeBlock = self:GetCodeBlock()
 	if(codeBlock) then
 		if(self.isPowered and not codeBlock:IsLoaded()) then
-			self:Restart();
+			if(not GameLogic.isRemote) then
+				self:Restart();
+			end
 		elseif(not self.isPowered and codeBlock:IsLoaded()) then
 			self:Stop();
 		end
@@ -287,6 +293,10 @@ function Entity:SetDisplayName(v)
 			codeBlock:SetBlockName(v);
 		end
 	end
+end
+
+function Entity:IsSearchable()
+	return true;
 end
 
 -- only search in 4 horizontal directions for a maximum distance of 16
@@ -402,8 +412,8 @@ end
 -- @return: return true if it is an action block and processed . 
 function Entity:OnClick(x, y, z, mouse_button, entity, side)
 	if(GameLogic.isRemote) then
-		if(mouse_button == "left") then
-			-- GameLogic.GetPlayer():AddToSendQueue(GameLogic.Packets.PacketClickEntity:new():Init(entity or GameLogic.GetPlayer(), self, mouse_button, x, y, z));
+		if(mouse_button=="right" and GameLogic.GameMode:CanEditBlock()) then
+			self:OpenEditor("entity", entity);
 		end
 		return true;
 	else
@@ -661,4 +671,29 @@ end
 -- create a wrapper of item stack 
 function Entity:GetItemStackIndex(itemStack)
 	return self.inventory:GetItemStackIndex(itemStack)
+end
+
+-- Overriden to provide the network packet for this entity.
+function Entity:GetDescriptionPacket()
+	local x,y,z = self:GetBlockPos();
+	return Packets.PacketUpdateEntityBlock:new():Init(x,y,z, self:SaveToXMLNode());
+end
+
+-- update from packet. 
+function Entity:OnUpdateFromPacket(packet_UpdateEntityBlock)
+	if(packet_UpdateEntityBlock:isa(Packets.PacketUpdateEntityBlock)) then
+		local node = packet_UpdateEntityBlock.data1;
+		if(node) then
+			self.blockly_nplcode = nil;
+			self.nplcode = nil;
+			self:LoadFromXMLNode(node)
+			self:OnInventoryChanged();
+			self:remotelyUpdated();
+		end
+	end
+end
+
+function Entity:EndEdit()
+	Entity._super.EndEdit(self);
+	self:MarkForUpdate();
 end
