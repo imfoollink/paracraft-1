@@ -96,7 +96,7 @@ function WorldServer:CreateAdminPlayer()
 		local oldPlayer = EntityManager.GetPlayer();
 		if(oldPlayer) then
 			entityMP:SetSkin(oldPlayer:GetSkin());
-			entityMP:SetGravity(oldPlayer:GetGravity());
+			-- entityMP:SetGravity(oldPlayer:GetGravity());
 			entityMP:SetPosition(oldPlayer:GetPosition());
 		end
 		entityMP:Attach();
