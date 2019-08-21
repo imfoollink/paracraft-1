@@ -109,7 +109,7 @@ function WorldServer:CreateAdminPlayer()
 			entityMP:SetAdmin(true);
 			entityMP:SetMainAssetPath(oldPlayer:GetMainAssetPath());
 			entityMP:SetSkin(oldPlayer:GetSkin());
-			entityMP:SetGravity(oldPlayer:GetGravity());
+			-- entityMP:SetGravity(oldPlayer:GetGravity());
 			entityMP:SetPosition(oldPlayer:GetPosition());
 			if(entityMP:IsShowHeadOnDisplay() and System.ShowHeadOnDisplay) then
 				System.ShowHeadOnDisplay(true, entityMP:GetInnerObject(), entityMP:GetDisplayName(), GameLogic.options.PlayerHeadOnTextColor);	
