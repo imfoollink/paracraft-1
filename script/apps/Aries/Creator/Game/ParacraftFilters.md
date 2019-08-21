@@ -70,20 +70,24 @@ This gives an overview of filters in paracraft. Please search the source code of
   - "OnWorldLoaded" when world is successfully loaded
   - "OnWorldUnloaded" when world is unloaded
   - "shouldRefreshWorldFile" true, fullname: whether to refresh the world file. 
-
+  
 - global:
   - "register_classes_into_sandbox_api", additionalEnv:
   - "desktop_menu", menu_items:
   - "new_item", itemStackArray, self:
   - "item_client_new_item_type_added", block_id, item:
   - "user_event_stat", category, action, value, label:
+  - "OnBeforeRestart", appName: before entire NPL runtime is restarted. 
 - file exporters:
   - "file_exported", id, filename:
   - "GetExporters", exporters: file exporters
   - "export_to_file", filename:
   - "select_exporter", id:
+  - "OnInstallModel": filename, url: called when /install -ext bmax commands are executed. 
+
 - command:
   - "register_command": register additional commands
+
 - networking:
   - "handleLogin", packet_login: whenever client received confirmed login packet from server. 
   - "entity_player_mp_other_entity_action_state_updated", entity_player_mp_other: after every time entity action state get updated for EntityPlayerMPOther

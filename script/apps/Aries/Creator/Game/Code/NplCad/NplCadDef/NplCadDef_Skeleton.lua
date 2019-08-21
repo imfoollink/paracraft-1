@@ -35,7 +35,8 @@ createJointRoot()
     arg0 = {
         {
 			name = "name",
-			type = "field_input",
+			type = "input_value",
+			shadow = { type = "text", value = "",},
 			text = "",
 		},
         {
@@ -69,7 +70,7 @@ createJointRoot()
 	canRun = false,
 	previousStatement = true,
 	nextStatement = true,
-	func_description = 'createJoint("%s",%s,%s,%s)\\n%sendJoint()',
+	func_description = 'createJoint(%s,%s,%s,%s)\\n%sendJoint()',
 	ToNPL = function(self)
 		return string.format('createJoint("%s",%s,%s,%s)\n    %s\nendJoint()\n', 
             self:getFieldValue('name'),
@@ -98,7 +99,6 @@ endJoint()
 	},
 	category = "Skeleton", 
 	helpUrl = "", 
-    colour = "#1567a9",
 	canRun = false,
     previousStatement = true,
 	nextStatement = true,
@@ -110,6 +110,48 @@ endJoint()
 	examples = {{desc = "", canRun = true, code = [[
 bindNodeByName("object1")
     ]]}},
+},
+
+{
+	type = "boneNames", 
+	message0 = L"%1",
+	arg0 = {
+        {
+			name = "name",
+			type = "field_dropdown",
+			options = {
+				{ L"头", "'Head'" },
+				{ L"脖子", "'Neck'" },
+				{ L"左大臂", "'L_UpperArm'" },
+				{ L"右大臂", "'R_UpperArm'" },
+				{ L"左前臂", "'L_Forearm'" },
+				{ L"右前臂", "'R_Forearm'" },
+				{ L"左手", "'L_Hand'" },
+				{ L"右手", "'R_Hand'" },
+				{ L"脊柱", "'Spine'" },
+				{ L"骨盆", "'Pelvis'" },
+				{ L"左大腿", "'L_Thigh'" },
+				{ L"右大腿", "'R_Thigh'" },
+				{ L"左小腿", "'L_Calf'" },
+				{ L"右小腿", "'R_Calf'" },
+                { L"左脚", "'L_Foot'" },
+				{ L"右脚", "'R_Foot'" },
+			},
+		},
+	},
+    
+	category = "Skeleton", 
+	helpUrl = "", 
+	canRun = false,
+    output = {type = "null",},
+	func_description = '%s',
+	ToNPL = function(self)
+		return string.format('%s', 
+            self:getFieldAsString('name')
+            );
+	end,
+	examples = {{desc = "", canRun = true, code = [[
+]]}},
 },
 
 };

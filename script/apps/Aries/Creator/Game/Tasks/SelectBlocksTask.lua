@@ -22,6 +22,8 @@ NPL.load("(gl)script/apps/Aries/Creator/Game/SceneContext/RedirectContext.lua");
 NPL.load("(gl)script/ide/AudioEngine/AudioEngine.lua");
 local AudioEngine = commonlib.gettable("AudioEngine");
 NPL.load("(gl)script/apps/Aries/Creator/Game/Tasks/TransformWnd.lua");
+NPL.load("(gl)script/apps/Aries/Creator/Game/Common/Files.lua");
+local Files = commonlib.gettable("MyCompany.Aries.Game.Common.Files");
 local TransformWnd = commonlib.gettable("MyCompany.Aries.Game.Tasks.TransformWnd");
 local Direction = commonlib.gettable("MyCompany.Aries.Game.Common.Direction")
 local ShapeAABB = commonlib.gettable("mathlib.ShapeAABB");
@@ -83,7 +85,8 @@ function SelectBlocks.filter_file_exported(id, filename)
 	if(not self) then
 		return id;
 	end
-	if(id == "bmax" and filename) then
+	if((id == "bmax" or id == "template") and filename) then
+		filename = Files.GetRelativePath(filename)
 		filename = commonlib.Encoding.DefaultToUtf8(filename)
 		GameLogic.RunCommand(string.format("/take BlockModel {tooltip=%q}", filename));
 	end
