@@ -1096,11 +1096,12 @@ end
 
 --virtual function:
 function Entity:SetScalingDelta(v)
-	
+	self:SetScaling(self:GetScaling() + v)
 end
 
 --virtual function:
 function Entity:SetFacingDelta(v)
+	self:SetFacing(self:GetFacing() + v)
 end
 
 -- set facing of the lower object. 
@@ -1108,6 +1109,9 @@ function Entity:SetFacing(facing)
 	local obj = self:GetInnerObject();
 	if(obj) then
 		self.facing = facing;
+		if(self.rotationYaw) then
+			self.rotationYaw = facing;
+		end
 		obj:SetFacing(facing);
 	end
 end
